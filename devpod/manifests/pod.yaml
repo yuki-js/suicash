@@ -15,20 +15,61 @@ spec:
   imagePullSecrets:
     - name: github-registry-secret
 
+  # The container process stays root ONLY so that sshd can bind port 22 and
+  # setuid into the unprivileged "user" account for every login session.
+  # sshd is configured with "AllowUsers user" and "PermitRootLogin no", so
+  # direct root SSH is refused; escalation is via sudo from "user".
+  # Do NOT set this to 1000: sshd would no longer be able to bind :22.
   securityContext:
     runAsUser: 0
     seccompProfile:
       type: RuntimeDefault
 
+  initContainers:
+    - name: prepare-home
+      # Pinned by digest: ":latest" is only re-tagged by a build on main, so the
+      # tag can still point at an older image than this commit. A digest names
+      # exactly the build this manifest was validated against.
+      image: ghcr.io/yuki-js/suicash@sha256:0e9232ee433353fde3ce1010174838a0009ae21b4d4ca2bbb10d8b40273e33ca
+      # A digest is immutable, so re-resolving the tag would be pure overhead.
+      # This also keeps the Pod spec stable: imagePullPolicy is immutable on a
+      # running Pod and would otherwise break every future apply.
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/bash", "-lc"]
+      args:
+        - |
+          set -euo pipefail
+          chown 1000:1000 /home/user
+          chmod 0700 /home/user
+      securityContext:
+        runAsUser: 0
+        privileged: false
+        allowPrivilegeEscalation: false
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          memory: 128Mi
+      volumeMounts:
+        - name: home
+          mountPath: /home/user
+
   containers:
     - name: suicash
-      image: ghcr.io/yuki-js/suicash:latest
+      # Must match the init container exactly.
+      image: ghcr.io/yuki-js/suicash@sha256:0e9232ee433353fde3ce1010174838a0009ae21b4d4ca2bbb10d8b40273e33ca
       imagePullPolicy: IfNotPresent
 
       securityContext:
         runAsUser: 0
         privileged: false
-        allowPrivilegeEscalation: false
+        # Must stay true. allowPrivilegeEscalation:false sets NoNewPrivs=1,
+        # which makes setuid sudo fail outright, so "user" could not escalate
+        # at all. The container is already unprivileged (privileged:false) and
+        # carries only the default capability set, so this is the smallest
+        # change that lets "user" sudo as the CEO chose.
+        allowPrivilegeEscalation: true
 
       ports:
         - name: ssh
@@ -51,5 +92,14 @@ spec:
         limits:
           # RAM is bounded; CPU is intentionally left unlimited for burst use.
           memory: 8Gi
+
+      volumeMounts:
+        - name: home
+          mountPath: /home/user
+
+  volumes:
+    - name: home
+      persistentVolumeClaim:
+        claimName: suicash-home
 
   terminationGracePeriodSeconds: 10
