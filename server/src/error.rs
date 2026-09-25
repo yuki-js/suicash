@@ -6,6 +6,7 @@ use jsonrpsee::types::{ErrorCode, ErrorObjectOwned};
 pub const MAC_MISMATCH: i32 = -32010;
 pub const TID_MISMATCH: i32 = -32011;
 pub const C1B_MISMATCH: i32 = -32012;
+pub const PROVE_FAILED: i32 = -32020;
 
 pub fn invalid_params(msg: impl Into<String>) -> ErrorObjectOwned {
     ErrorObjectOwned::owned(ErrorCode::InvalidParams.code(), msg.into(), None::<String>)
@@ -21,6 +22,10 @@ pub fn mac_mismatch() -> ErrorObjectOwned {
         "AUTH2 MAC verification failed",
         None::<String>,
     )
+}
+
+pub fn prove_failed(msg: impl Into<String>) -> ErrorObjectOwned {
+    ErrorObjectOwned::owned(PROVE_FAILED, msg.into(), None::<String>)
 }
 
 pub fn tid_mismatch() -> ErrorObjectOwned {

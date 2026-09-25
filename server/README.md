@@ -1,29 +1,15 @@
-# `server` — FeliCa oracle, phase 1 of 3
+# `server` — FeliCa oracle, IDi-level
 
 The oracle completes FeliCa DES mutual authentication on a card holder's
 behalf, then attests the card's identity with a zero-knowledge proof.
 
-This is **phase 1**: the two mutual-authentication RPCs, `challenge` and
-`settle`. The third RPC, `attest`, and with it the Groth16 circuit and the
-proving key, lands in phase 2.
-
 `../ref-impl-of-oracle/` is the **reference implementation**: frozen, kept
-green, deliberately not modified. This crate is the new thing, and phase 3
-will pair it with `../prover/`.
+green, deliberately not modified. This crate is the new thing, and it pairs
+with `../prover/`.
 
-## Phasing
-
-| Phase | Adds | Needs a proving key? |
-|---|---|---|
-| **1 — this crate** | `challenge`, `settle` | no |
-| 2 | `attest`, `get_verifying_key`, proving-key loading | yes |
-| 3 | (nothing new; the two crates together) | yes |
-
-Splitting here is not only about diff size. Phase 1 has **no ZK machinery at
-all**: no circuit, no proving key, no `FELICA_PROVING_KEY_PATH`, no
-`FELICA_TEST_PK`. The whole suite runs in milliseconds instead of ~1.2 s per
-proof, and the server starts in milliseconds instead of ~4 s deserializing a
-31 MB key. Each phase is independently reviewable and independently runnable.
+```sh
+diff -u ../ref-impl-of-oracle/server/src/api/service.rs src/api/service.rs
+```
 
 ## RPC surface
 
@@ -32,90 +18,146 @@ proof, and the server starts in milliseconds instead of ~4 s deserializing a
 | `ping` | — | `"pong"` |
 | `challenge` | `{idm, r1}` | `{c1a, system_code, areas, services}` |
 | `settle` | `{idm, r1, c1b, c2a}` | `{c2b}` |
+| `attest` | `{idm, c1b, c2a, auth2}` | `{idi, attested_at, proof}` |
+| `get_verifying_key` | — | vk hex (360 bytes for 3 public inputs) |
 
-Flow: `challenge` → card `Authentication1` → `settle` → card `Authentication2`.
+Flow: `challenge` → card `Authentication1` → `settle` → card `Authentication2`
+→ `attest`. Stateless; the three calls share no session state.
 
 - `challenge` derives the card's session keys from `(gsk, usk, idm)` and
-  answers with C1A. It also returns the **node path** (system code, areas,
-  services) because the holder needs it to build `Authentication1`, and `c1a`
-  alone is not actionable.
-- `settle` verifies the card's C1B against the holder's `r1`, recovers R2 from
-  C2A, and answers with C2B. That completes mutual authentication.
+  answers with C1A, plus the **node path** (system code, areas, services) that
+  the holder needs to build `Authentication1` — `c1a` alone is not actionable.
+- `settle` verifies C1B against the holder's `r1`, recovers R2 from C2A, and
+  answers with C2B. That completes mutual authentication.
+- `attest` verifies the AUTH2 ciphertext and produces a Groth16 proof binding
+  the claimed `idi` to the master-key derivation.
 
-Stateless: the two calls share no session state. The key material is
-pre-resolved (`FELICA_KEYS_JSON` carries GSK/USK plus the node path), so
-system → area → service chain resolution is provisioning's job, not the
-server's.
+Error codes: `-32602` invalid params, `-32010` `MAC_MISMATCH`, `-32011`
+`TID_MISMATCH` (also covers a non-fresh AUTH2 transaction number), `-32012`
+`C1B_MISMATCH`, `-32020` `PROVE_FAILED`, `-32603` internal.
 
-Error codes: `-32602` invalid params, `-32012` `C1B_MISMATCH`, `-32603`
-internal. `-32010` `MAC_MISMATCH` and `-32011` `TID_MISMATCH` are defined in
-`error.rs` but unused until phase 2 — they belong to AUTH2 verification, which
-`attest` drives.
+## The `attest` envelope
 
-### Why `settle` requires `r1`
+Three public inputs, well under Sui's cap of 8. Everything the transcript
+carries — `c1b`, `c2a`, `r2`, `auth2`, and the master keys — is a **private
+witness**, so a verifier learns the identity claim and nothing else.
 
-Without the holder's real challenge, the C1B check is recover-then-re-encrypt
-and *always* matches — `settle` could not authenticate anything. The holder
-generated `r1` at `challenge`, so sending it costs nothing and makes the check
-genuine: `3DES(L,β,r1) == c1b`, else `C1B_MISMATCH`.
+| PI | Content |
+|---|---|
+| `pi0` | `idi` — the sole identity claim |
+| `pi1` | `r1` — the holder's fresh session challenge |
+| `pi2` | `attested_at` — prover-chosen, drift signal only |
 
-`settle_rejects_c1b_from_a_different_r1` pins that a C1B from another session
-is refused, which is the property `r1` buys.
+The response is `{idi, attested_at, proof}` and nothing else. `prover::
+verify_attestation_detailed` re-checks that correspondence before returning
+`Ok`, which is what makes it safe to read `idi` from an envelope that reported
+success. `attest_envelope_is_idi_only` pins the shape.
+
+**`r1` is deliberately not echoed.** It is a public input and the proof is
+bound to it, but the holder generated it and the holder is the party that
+checks freshness. The oracle publishing it back would be the oracle vouching
+for its own freshness.
 
 ## Removed from the reference, and why
 
 | Reference | Here | Reason |
 |---|---|---|
-| `settle` takes `read_spec`, returns `ecmd` | gone | `auth2` already carries `idi`; the IDi-level statement covers no read response |
+| `settle` takes `read_spec`, returns `ecmd` | gone | `auth2` already carries `idi`; the statement covers no read response |
 | `schedule` mirrors secure-messaging framing (PKCS#7, forward MAC, DES-CBC, read command/response) | gone | 468 → 118 lines; AUTH2 verification delegates to felica-rs anyway |
-| `params.rs`, `FELICA_PROVING_KEY_PATH` | gone | phase 2 |
-| `k_group`/`k_user` field names | `gsk`/`usk` | matches the prover's `ProveRequest` |
+| `attest` takes `cm`, returns `cm_out` | gone | commitment no longer in the statement; also retires the arkworks-vs-circomlib Poseidon gap |
+| `attest` returns `r2` | gone | `r2` is a private witness — see below |
+| `verify_session` takes `cm` | gone | no commitment to echo |
 | `read_invariants.rs` (450 lines) | gone | no read path to pin |
+| `k_group`/`k_user` field names | `gsk`/`usk` | matches the prover's `ProveRequest` |
+| `get_proving_key` RPC | already absent upstream | kept absent; regression-tested |
 
-`src/` is ~640 lines. Tests: 9 across 3 files.
+Net: `src/` 1,589 → ~1,210 lines, tests 23 → 15 across 4 files.
+
+### `r2` staying private is the quiet win
+
+In the reference, publishing `r2` meant that after attestation any party
+holding it could produce syntactically valid ciphertexts — the
+commitment-before-disclosure ordering was the only thing preventing fabricated
+read data. At IDi level there is no read and no `r2` on the wire, so that
+surface is **absent** rather than defended.
+
+## Two defects fixed rather than copied
+
+The reference had two availability defects that would have shipped as-is. Both
+were flagged by an audit of the reference, and both are cheap to fix while
+writing the file.
+
+**1. Proving ran on the async runtime.** `attest` was `async fn` but called the
+blocking ~1.2 s `prove()` directly, occupying a Tokio worker thread for the
+duration. `ping` — which is exactly what the liveness and readiness probes poll
+— is served by those same workers, so a few concurrent `attest` calls could get
+the pod killed mid-proof. Now dispatched via `spawn_blocking`.
+
+**2. No concurrency limit.** jsonrpsee defaults to 100 connections with no
+bound on in-flight work. At ~500 MB peak per prove, 100 concurrent calls is a
+guaranteed OOMKill, and `attest` is stateless so no card is needed. Now gated
+on a `Semaphore` with `MAX_CONCURRENT_PROOFS = 1`; excess requests queue
+rather than erroring, so the failure mode is latency.
+`concurrent_attest_all_succeed` covers the combination.
+
+The proving key is held as an `Arc` so a handle can move into the blocking
+pool. Cloning the `ProvingKey` itself would copy 31 MB per request.
 
 ## Protocol break vs the reference
 
-**Unknown params are silently ignored.** jsonrpsee extracts named parameters
-individually, so a param the method does not declare — `read_spec` on
-`settle` — is dropped without error. `#[serde(deny_unknown_fields)]` on
-`SettleRequest` does *not* help: the struct is assembled by hand after
-extraction and never sees the raw params object. Enforcing it would mean
-switching the trait to take each struct as a single positional param, which
-changes the wire format from object-form to array-wrapped.
+**Unknown params are silently ignored.** jsonrpsee's `#[method]` extracts each
+named param individually, so a param the method does not declare — `cm` on
+`attest`, `read_spec` on `settle` — is dropped without error.
+`#[serde(deny_unknown_fields)]` on the `*Request` structs does *not* help: the
+structs are assembled by hand after extraction and never see the raw params
+object, so the attribute is a no-op that reads as if it were enforced.
 
-Consequence: a reference-era client that asks for a read still gets a **valid**
-settlement with no read in it, and nothing errors. Pinned as a test rather
-than left as a surprise. The clean fix is the wire-format change, and it
-belongs in a version bump — not a silent patch.
+Consequence: a reference-era client that sends `cm` still gets a **valid**
+attestation, just with the commitment quietly absent. It fails later, on the
+client, looking for `cm_out` in a response that no longer has the field. Both
+cases are pinned as tests rather than left as a surprise.
 
-## Known limitation, unchanged from the reference
+Enforcing it means changing each `#[method]` to take its struct as a single
+positional param, converting the wire format from object-form to array-wrapped.
+That is a breaking client change and belongs in a version bump, not a silent
+patch.
 
-**No transport authentication and no rate limiting.** `settle` is reachable by
-anyone who can reach the port, and it is cheap enough that a caller can drive
-sessions at will. The spec assigns client authentication and rate limiting to
-a gateway (§11); nothing in this crate enforces either.
+## Known limitations
 
-`settle_has_no_transport_authentication` pins this as a decision on record
-rather than an oversight. It matters more than it looks: the oracle holds the
-FeliCa master keys and derives per-card session keys for any `idm` it is
-asked about, so this endpoint is a card-key-derivation oracle. Put a gateway
-in front of it before exposing it.
+**No transport authentication and no rate limiting.** The spec assigns client
+authentication and rate limiting to a gateway (§11); nothing here enforces
+either. `settle_has_no_transport_authentication` pins this as a decision.
+
+It matters more than it looks: the oracle holds the FeliCa master keys and
+derives per-card session keys for any `idm` it is asked about, so this service
+is a card-key-derivation oracle, and `attest` is additionally a ~1.2 s
+CPU-amplifying endpoint. Put a gateway in front of it before exposing it.
+
+**The P0 is still open.** This service does **not** prove card presence.
+`l = gsk ⊕ idm` with `idm` an ordinary request parameter, so the oracle is a
+complete card simulator. D1–D3 in the circuit pin `l` to the oracle's own key
+custody — a real consistency property, not an authority one.
+`../prover/README.md` has the full argument and
+`../prover/tests/forgery_authority.rs` demonstrates it empirically: a forgery
+built from the public proving key with *invented* key material verifies.
+
+`attest` does fail closed on disagreement between the prover and the native
+session verifier (`service.rs`) — those were `debug_assert_eq!` in the
+reference, compiled out in release, meaning the production image could attest
+to a session it had not verified. They are unconditional here.
 
 ## Run it
 
 ```sh
-cargo run --release --example rpc_auth    # prints the keys the server needs
+cargo run --release --example rpc_attest    # prints the env the server needs
 ```
 
 The example drives the emulated card itself, so the server must be started
-with the fixture's derived keys:
+with the fixture's derived keys — it prints the exact `FELICA_KEYS_JSON` and
+`FELICA_PROVING_KEY_PATH`.
 
-```sh
-FELICA_KEYS_JSON='{"gsk":"4abbe342d26c64f1","usk":"53af2483920bf339","system_code":3,"areas":[64],"services":[72]}' \
-FELICA_BIND_ADDR=127.0.0.1:3000 \
-  cargo run --release
-```
+Startup takes ~4 s: the 31 MB key is deserialized before the socket binds, so a
+corrupt key fails the deploy rather than the first request.
 
 ## Tests
 
@@ -123,30 +165,30 @@ FELICA_BIND_ADDR=127.0.0.1:3000 \
 cargo build --release                        clean
 cargo fmt --check                            clean
 cargo clippy --all-targets -- -D warnings    clean
-cargo test --release                         9 passed, 0 failed
+cargo test --release                         15 passed, 0 failed
 ```
 
-No environment setup: no `FELICA_TEST_PK`, no ceremony, no fixtures on disk.
+Needs the ceremony key from the prover crate:
+
+```sh
+FELICA_TEST_PK=../prover/assets/proving_key.bin cargo test --release
+```
 
 `tests/rpc_http.rs` runs a real jsonrpsee server on a loopback port and speaks
 raw HTTP/1.1 to it, so the wire format is covered rather than assumed — and it
 asserts that batch requests are refused, matching `src/main.rs`.
 
-`tests/schedule_proof.rs` pins the DES schedule against the FIPS vector and
-drives a real felica-rs emulated card end to end, including AUTH2
-verification — that is the code phase 2 builds on, so it is worth having green
-now.
-
 ## Layout
 
 ```
-src/main.rs            bootstrap; no key material on disk in this phase
-src/config.rs          FELICA_KEYS_JSON, bind addr
+src/main.rs            bootstrap; deserializes the key before binding
+src/config.rs          FELICA_KEYS_JSON, bind addr, key path
+src/params.rs          key file presence/size checks, one load at startup
 src/error.rs           JSON-RPC error codes
-src/api/handler.rs     trait + struct
-src/api/service.rs     challenge and settle logic
+src/api/handler.rs     trait, Arc'd key cache, proof semaphore
+src/api/service.rs     business logic
 src/api/types.rs       wire DTOs
-src/oracle/mod.rs      key schedule, AUTH2 verification
+src/oracle/mod.rs      key schedule, AUTH2 verification, session verification
 src/oracle/schedule.rs challenge schedule only
 src/oracle/fixture.rs  shared emulated card (tests + example)
 ```

@@ -6,13 +6,13 @@
 //!   to (`gsk`/`usk` hex, `system_code`, `areas`, `services`).
 //!   System/area/service codes select the authenticated key node, so they
 //!   are key material too.
-//! - ConfigMap: `FELICA_BIND_ADDR` (optional). Purely operational, no keying.
+//! - ConfigMap: `FELICA_BIND_ADDR` (optional), `FELICA_PROVING_KEY_PATH`
+//!   (optional). Purely operational, no keying.
 //!
 //! Single-node deployment: one GSK/USK pair plus the node path
 //! (system code, area list, service list) it belongs to.
-//!
-//! There is no proving-key configuration in this phase — `attest` and the ZK
-//! circuit arrive in phase 2 and bring `FELICA_PROVING_KEY_PATH` with them.
+
+use std::path::PathBuf;
 
 use anyhow::Context;
 use serde::Deserialize;
@@ -53,6 +53,8 @@ pub struct AppConfig {
     pub areas: Vec<u16>,
     /// Service code list for Authentication1.
     pub services: Vec<u16>,
+    /// Filesystem path to the Groth16 proving key (image-baked file).
+    pub proving_key_path: PathBuf,
 }
 
 fn required_var(var: &str) -> anyhow::Result<String> {
@@ -70,6 +72,9 @@ impl AppConfig {
             system_code: keys.system_code,
             areas: keys.areas,
             services: keys.services,
+            proving_key_path: std::env::var("FELICA_PROVING_KEY_PATH")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| crate::params::default_proving_key_path()),
         })
     }
 }

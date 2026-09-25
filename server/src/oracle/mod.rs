@@ -152,3 +152,74 @@ pub fn verify_auth2(r2: &[u8; 8], auth2_ct: &[u8; 32]) -> Result<Auth2Data, Auth
     pmi.copy_from_slice(&payload[16..24]);
     Ok(Auth2Data { tn, tid, idi, pmi })
 }
+
+/// Attest-time verification outcome: everything the proof will certify.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedSession {
+    pub r1: [u8; 8],
+    pub r2: [u8; 8],
+    pub idi: [u8; 8],
+    pub tid: [u8; 6],
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttestError {
+    Malformed,
+    MacMismatch,
+    TidMismatch,
+    /// AUTH2 TN was not [`EXPECTED_AUTH2_TN`].
+    ///
+    /// Mapped to the spec §8.4 `TID_MISMATCH` code: a fresh-session TN is the
+    /// same class of staleness/replay signal as a fresh TID, and the spec has
+    /// no separate code for it. This mapping is deliberate, not incidental.
+    UnexpectedTn,
+}
+
+impl fmt::Display for AttestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Malformed => write!(f, "malformed attest inputs"),
+            Self::MacMismatch => write!(f, "AUTH2 MAC verification failed"),
+            Self::TidMismatch => write!(f, "AUTH2 transaction ID mismatch"),
+            Self::UnexpectedTn => {
+                write!(f, "AUTH2 transaction number is not {EXPECTED_AUTH2_TN}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for AttestError {}
+
+/// Verify the full authentication exchange for `attest` (circuit constraints
+/// C2, C4, C5, C6; C1's circuit check is mirrored by settle's genuine C1B
+/// verification).
+///
+/// `r1` is recovered internally (`3DES⁻¹(L,β,c1b)`); no C1B re-check happens
+/// here — it would be tautological. The binding is deferred: the proof carries
+/// recovered-`r1` as the public input `pi1`, and the holder checks it against
+/// the `r1` it generated.
+pub fn verify_session(
+    keys: &OracleKeys,
+    idm: &[u8; 8],
+    c1b: &[u8; 8],
+    c2a: &[u8; 8],
+    auth2_ct: &[u8; 32],
+) -> Result<VerifiedSession, AttestError> {
+    let session = keys.session(idm);
+    let r1 = session.recover_r1(c1b);
+    let r2 = session.open_r2(c2a);
+    let auth = verify_auth2(&r2, auth2_ct).map_err(|e| match e {
+        Auth2Error::MacMismatch => AttestError::MacMismatch,
+        Auth2Error::Malformed => AttestError::Malformed,
+        Auth2Error::UnexpectedTn => AttestError::UnexpectedTn,
+    })?;
+    if auth.tid != r1[2..8] {
+        return Err(AttestError::TidMismatch);
+    }
+    Ok(VerifiedSession {
+        r1,
+        r2,
+        idi: auth.idi,
+        tid: auth.tid,
+    })
+}
