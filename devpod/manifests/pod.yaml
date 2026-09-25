@@ -15,6 +15,11 @@ spec:
   imagePullSecrets:
     - name: github-registry-secret
 
+  # The container process stays root ONLY so that sshd can bind port 22 and
+  # setuid into the unprivileged "user" account for every login session.
+  # sshd is configured with "AllowUsers user" and "PermitRootLogin no", so
+  # direct root SSH is refused; escalation is via sudo from "user".
+  # Do NOT set this to 1000: sshd would no longer be able to bind :22.
   securityContext:
     runAsUser: 0
     seccompProfile:
@@ -23,7 +28,9 @@ spec:
   initContainers:
     - name: prepare-home
       image: ghcr.io/yuki-js/suicash:latest
-      imagePullPolicy: IfNotPresent
+      # Always pull: the ":latest" tag is rebuilt by CI, so a cached node copy
+      # would keep serving the previous image and mask a rollback.
+      imagePullPolicy: Always
       command: ["/bin/bash", "-lc"]
       args:
         - |
@@ -47,7 +54,9 @@ spec:
   containers:
     - name: suicash
       image: ghcr.io/yuki-js/suicash:latest
-      imagePullPolicy: IfNotPresent
+      # Must match the init container: a stale cached ":latest" here would
+      # run an old sshd configuration.
+      imagePullPolicy: Always
 
       securityContext:
         runAsUser: 0
