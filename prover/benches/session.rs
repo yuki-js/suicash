@@ -21,12 +21,12 @@ use felica::felica_standard::{
     EmulatedSystem as EmuSys, FelicaStandardCommand, FelicaStandardEmulator,
     FelicaStandardResponse, ServiceCode,
 };
+use hex_literal::hex;
 use prover::{
     blank_constraint_counts,
     des::{cbc_decrypt, command_mac, des_encrypt, tdes_decrypt, tdes_encrypt},
     verify_attestation, ProveRequest,
 };
-use hex_literal::hex;
 
 const IDM: [u8; 8] = hex!("0102030405060708");
 const IDI: [u8; 8] = hex!("1020304050607080");

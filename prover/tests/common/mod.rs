@@ -16,12 +16,12 @@ use felica::felica_standard::{
     Type3TagPollingResult,
 };
 use felica::RemoteTarget;
+use hex_literal::hex;
 use prover::{
     circuit::FelicaCircuit,
     des::{cbc_decrypt, command_mac, des_encrypt, tdes_decrypt, tdes_encrypt},
     ProveRequest,
 };
-use hex_literal::hex;
 
 pub const IDM: [u8; 8] = hex!("0102030405060708");
 pub const IDI: [u8; 8] = hex!("1020304050607080");
