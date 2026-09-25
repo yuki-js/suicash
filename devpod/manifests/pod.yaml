@@ -52,4 +52,13 @@ spec:
           # RAM is bounded; CPU is intentionally left unlimited for burst use.
           memory: 8Gi
 
+      volumeMounts:
+        - name: home
+          mountPath: /home/user
+
+  volumes:
+    - name: home
+      persistentVolumeClaim:
+        claimName: suicash-home
+
   terminationGracePeriodSeconds: 10

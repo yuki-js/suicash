@@ -6,6 +6,7 @@ namespace: suicash
 resources:
   - manifests/namespace.yaml
   - manifests/serviceaccount.yaml
+  - manifests/pvc.yaml
   - manifests/pod.yaml
   - manifests/service.yaml
   - manifests/ingress.yaml

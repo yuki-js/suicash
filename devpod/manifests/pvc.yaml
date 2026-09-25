@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: suicash-home
+  labels:
+    app.kubernetes.io/name: suicash
+    app.kubernetes.io/part-of: suicash
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-single-replica
+  resources:
+    requests:
+      storage: 2Gi
