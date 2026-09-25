@@ -27,10 +27,14 @@ spec:
 
   initContainers:
     - name: prepare-home
-      image: ghcr.io/yuki-js/suicash:latest
-      # Always pull: the ":latest" tag is rebuilt by CI, so a cached node copy
-      # would keep serving the previous image and mask a rollback.
-      imagePullPolicy: Always
+      # Pinned by digest: ":latest" is only re-tagged by a build on main, so the
+      # tag can still point at an older image than this commit. A digest names
+      # exactly the build this manifest was validated against.
+      image: ghcr.io/yuki-js/suicash@sha256:0e9232ee433353fde3ce1010174838a0009ae21b4d4ca2bbb10d8b40273e33ca
+      # A digest is immutable, so re-resolving the tag would be pure overhead.
+      # This also keeps the Pod spec stable: imagePullPolicy is immutable on a
+      # running Pod and would otherwise break every future apply.
+      imagePullPolicy: IfNotPresent
       command: ["/bin/bash", "-lc"]
       args:
         - |
@@ -53,10 +57,9 @@ spec:
 
   containers:
     - name: suicash
-      image: ghcr.io/yuki-js/suicash:latest
-      # Must match the init container: a stale cached ":latest" here would
-      # run an old sshd configuration.
-      imagePullPolicy: Always
+      # Must match the init container exactly.
+      image: ghcr.io/yuki-js/suicash@sha256:0e9232ee433353fde3ce1010174838a0009ae21b4d4ca2bbb10d8b40273e33ca
+      imagePullPolicy: IfNotPresent
 
       securityContext:
         runAsUser: 0
