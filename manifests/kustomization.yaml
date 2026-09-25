@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ida-gate
+
+resources:
+  - namespace.yaml
+  - oracle.yaml
+
+labels:
+  - pairs:
+      app: ida-gate
+
+images:
+  - name: ghcr.io/yuki-js/felica-ida-oracle
+    # No `newTag`. The Deployment pins a digest instead of a mutable tag: a
+    # tag can be repointed by anyone who can push to the registry, and
+    # `imagePullPolicy: Always` would then re-resolve it on every pod start.
+    # Substitute the real digest before applying.
+    digest: sha256:REPLACE_ME

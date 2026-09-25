@@ -2,10 +2,10 @@
 //!
 //! Split by sensitivity (spec `docs/spec.md` §2: key hierarchy "from
 //! environment", oracle stays stateless across calls per §8):
-//! - Secret `FELICA_KEYS_JSON`: key material plus the node path it belongs
-//!   to (`gsk`/`usk` hex, `system_code`, `areas`, `services`).
-//!   System/area/service codes select the authenticated key node, so they
-//!   are key material too.
+//! - Secret key material plus the node path it belongs to (`gsk`/`usk` hex,
+//!   `system_code`, `areas`, `services`), read from `FELICA_KEYS_JSON_FILE`
+//!   (preferred: a mounted Secret) or `FELICA_KEYS_JSON`. System/area/service
+//!   codes select the authenticated key node, so they are key material too.
 //! - ConfigMap: `FELICA_BIND_ADDR` (optional), `FELICA_PROVING_KEY_PATH`
 //!   (optional). Purely operational, no keying.
 //!
@@ -53,18 +53,36 @@ pub struct AppConfig {
     pub areas: Vec<u16>,
     /// Service code list for Authentication1.
     pub services: Vec<u16>,
-    /// Filesystem path to the Groth16 proving key (image-baked file).
+    /// Filesystem path to the Groth16 proving key. Baked into the image by
+    /// default; a deployment should mount one instead so it can be rotated
+    /// without a rebuild.
     pub proving_key_path: PathBuf,
 }
 
-fn required_var(var: &str) -> anyhow::Result<String> {
-    std::env::var(var).with_context(|| format!("{var} env var is required"))
+/// Read the key blob from `FELICA_KEYS_JSON_FILE` if set, else `FELICA_KEYS_JSON`.
+///
+/// The file form exists because an env var is a poor way to deliver a secret:
+/// it is visible in `kubectl describe pod`, in `/proc/1/environ`, in crash dumps,
+/// and in most APM and log-collection agents. A mounted Secret is visible to
+/// strictly fewer of them.
+///
+/// Whichever is used, the key material is parsed and then dropped; it is held in
+/// `AppConfig` as plain `[u8; 8]` for the life of the process, which is a known
+/// gap (the reference had the same one despite depending on `zeroize`).
+fn keys_source() -> anyhow::Result<String> {
+    if let Some(path) = std::env::var_os("FELICA_KEYS_JSON_FILE") {
+        let path = PathBuf::from(path);
+        return std::fs::read_to_string(&path)
+            .with_context(|| format!("read FELICA_KEYS_JSON_FILE at {}", path.display()));
+    }
+    std::env::var("FELICA_KEYS_JSON")
+        .context("FELICA_KEYS_JSON_FILE or FELICA_KEYS_JSON is required")
 }
 
 impl AppConfig {
     pub fn from_env() -> anyhow::Result<Self> {
-        let keys_raw = required_var("FELICA_KEYS_JSON")?;
-        let keys: KeysJson = serde_json::from_str(&keys_raw).context("invalid FELICA_KEYS_JSON")?;
+        let keys_raw = keys_source()?;
+        let keys: KeysJson = serde_json::from_str(&keys_raw).context("invalid key material")?;
         Ok(Self {
             bind_addr: std::env::var("FELICA_BIND_ADDR").ok(),
             gsk: keys.gsk,

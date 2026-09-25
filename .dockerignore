@@ -1,0 +1,15 @@
+# Build context is the repository root; keep it small. The `target/` directories
+# are multiple GB and would otherwise be shipped into the daemon on every build.
+target/
+prover/target/
+server/target/
+**/target/
+
+.git/
+.github/
+.gitignore
+.dockerignore
+
+# Not needed to build the binary.
+docs/
+**/*.md
