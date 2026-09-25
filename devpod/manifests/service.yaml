@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: suicash
+  labels:
+    app.kubernetes.io/name: suicash
+    app.kubernetes.io/part-of: suicash
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: suicash
+  ports:
+    - name: app-1919
+      port: 1919
+      targetPort: 1919
+      protocol: TCP
+    - name: app-4545
+      port: 4545
+      targetPort: 4545
+      protocol: TCP
+    - name: app-14514
+      port: 14514
+      targetPort: 14514
+      protocol: TCP

@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: suicash
+  labels:
+    app.kubernetes.io/name: suicash
+    app.kubernetes.io/part-of: suicash
+spec:
+  restartPolicy: Always
+  serviceAccountName: suicash
+  automountServiceAccountToken: false
+
+  # This Secret is intentionally not committed. Create or copy
+  # github-registry-secret in this namespace before starting the pod.
+  imagePullSecrets:
+    - name: github-registry-secret
+
+  securityContext:
+    runAsUser: 0
+    privileged: false
+    seccompProfile:
+      type: RuntimeDefault
+
+  containers:
+    - name: suicash
+      image: ghcr.io/yuki-js/suicash:latest
+      imagePullPolicy: IfNotPresent
+
+      securityContext:
+        runAsUser: 0
+        privileged: false
+        allowPrivilegeEscalation: false
+
+      ports:
+        - name: ssh
+          containerPort: 22
+          protocol: TCP
+        - name: app-1919
+          containerPort: 1919
+          protocol: TCP
+        - name: app-4545
+          containerPort: 4545
+          protocol: TCP
+        - name: app-14514
+          containerPort: 14514
+          protocol: TCP
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2Gi
+        limits:
+          # RAM is bounded; CPU is intentionally left unlimited for burst use.
+          memory: 8Gi
+
+  terminationGracePeriodSeconds: 10
