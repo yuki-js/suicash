@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: suicash
+  labels:
+    app.kubernetes.io/name: suicash
+    app.kubernetes.io/part-of: suicash
+  annotations:
+    # Existing cert-manager ClusterIssuer using Let's Encrypt DNS-01.
+    cert-manager.io/cluster-issuer: letsencrypt-cloudflare
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # These routes assume the three application ports speak HTTP.
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - ikuiku.ouchiserver.aokiapp.com
+        - sikosiko.ouchiserver.aokiapp.com
+        - iyokoiyo.ouchiserver.aokiapp.com
+      secretName: suicash-tls
+  rules:
+    - host: ikuiku.ouchiserver.aokiapp.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: suicash
+                port:
+                  number: 1919
+
+    - host: sikosiko.ouchiserver.aokiapp.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: suicash
+                port:
+                  number: 4545
+
+    - host: iyokoiyo.ouchiserver.aokiapp.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: suicash
+                port:
+                  number: 14514
