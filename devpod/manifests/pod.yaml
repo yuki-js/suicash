@@ -64,7 +64,12 @@ spec:
       securityContext:
         runAsUser: 0
         privileged: false
-        allowPrivilegeEscalation: false
+        # Must stay true. allowPrivilegeEscalation:false sets NoNewPrivs=1,
+        # which makes setuid sudo fail outright, so "user" could not escalate
+        # at all. The container is already unprivileged (privileged:false) and
+        # carries only the default capability set, so this is the smallest
+        # change that lets "user" sudo as the CEO chose.
+        allowPrivilegeEscalation: true
 
       ports:
         - name: ssh
