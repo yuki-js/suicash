@@ -9,4 +9,5 @@ resources:
   - manifests/pvc.yaml
   - manifests/pod.yaml
   - manifests/service.yaml
+  - manifests/service-ssh.yaml
   - manifests/ingress.yaml
