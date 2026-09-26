@@ -1,85 +1,75 @@
-# SuiCash マスコット
+# SuiCash Mascot
 
-`.opencode/skills/suicash/skill.md` の指定にもとづく。
+Based on the requirements in `.opencode/skills/suicash/skill.md`.
 
-> ## マスコットキャラクター
-> B案とペンギンのキメラ。
-> - B案の気持ち悪さを継承しつつ、色は紫にしない。
-> - 形状は一致させない。
+> ## Mascot character
+> A chimera of a chiibuki and a penguin.
+> - It inherits the unsettling nature of a chiibuki without using purple.
+> - The shape is not meant to match exactly.
 
-| ファイル | |
+| File | |
 | --- | --- |
-| `suicash-mascot.svg` | マスコット本体 |
+| `suicash-mascot.svg` | Main mascot artwork |
 
-## 何と何のキメラか
+## What is it a chimera of?
 
-**B案** … JR東日本が 2026 年 9 月に実施した「Suica 新キャラクターデザイン投票」の
-候補 B。うさぎのキャラクターで、**奇抜な紫色の体**と、うさぎにしては長すぎる耳を持つ。
-紫は「『スイスイ（安心）』を象徴する青と『ワクワク（感動）』を象徴する赤が
-混ざり合って生まれる色」、長い耳は「周囲の声に耳を傾ける」姿勢を表す、という
-設計意図が公表されている。発表直後は「不気味」「人を食べそう」と言われ、
-ネットでは**パープルデーモン / 毒うさぎ / 毒Yogibo**と呼ばれた。
+**chiibuki** — nanka chiisakute bukimi na yatsu. A tiny, creepy little thing .
 
-**ペンギン** … 2001 年から Suica のキャラクターを務め、2026 年度末で“卒業”する
-「Suica のペンギン」（原作：坂崎千春）。黒いシルエット、白い腹、フリッパー、
-水かきの足。
+**Penguin** — a penguin-like character from a world inhabited by those strangely uncanny little creatures.
 
-## 気持ち悪さの「仕組み」を移植する
+## Transferring the “mechanism” of the uncanny feeling
 
-形をなぞるのではなく、B案が不気味に見える理由を分解して移植した。
+Rather than tracing the shape directly, I broke down why a chiibuki feels eerie and transferred that logic into this design.
 
-1. **無定形の塊に、極端に小さい顔が低い位置で貼り付いている** …
-   顔の上に広大な空白ができ、頭と胴の境界が無くなる
-2. **顔が体に溶け込まず、白い「面」として浮いている** …
-   ここにペンギンの白い腹を融合させ、腹と顔がひと続きの白い領域になっている
-3. **口が顔の幅より広く裂けている** … 目の間隔より口のほうが広い
-4. **手足が退化した突起** … 骨格を感じさせない、長さの不揃いな 4 本が垂れ下がる
+1. **A formless blob with an extremely small face attached low on it** …
+   This creates a huge blank area above the face and makes the boundary between the head and body disappear.
+2. **The face does not blend into the body and instead floats as a white “mask”** …
+   I fused this with the penguin’s white belly so that the belly and face become one continuous white region.
+3. **The mouth is split much wider than the face** …
+   The mouth is wider than the distance between the eyes.
+4. **The hands and feet are degenerate protrusions** …
+   They feel like skeletal remnants, with four unevenly sized limbs hanging down.
 
-さらに、左右をわずかに崩している（目の大きさと高さ、笑いの左右、耳の長さと角度、
-脚の長さ）。完全な左右対称を避けることで座りの悪さが出る。
+Additionally, the left and right sides are slightly unbalanced (eye size and height, asymmetry in the smile, ear length and angle, and leg length). Avoiding perfect bilateral symmetry creates an awkward sitting posture.
 
-## キメラの核：耳をフリッパーにする
+## The core of the chimera: making the ears into flippers
 
-B案の最大の特徴は長い耳、ペンギンの最大の特徴はフリッパー（ひれ）。
-この 2 つを重ねて、**耳をフリッパーの形にした**。これでキメラであることが
-一目で分かり、同時に「形状は一致させない」も満たせる。
+The defining feature of a chiibuki is its long ears, and the defining feature of a penguin is its flippers. By combining these two, I made the **ears into flipper-shaped extensions**. This makes the chimera immediately recognizable while also satisfying the requirement that the shape not match exactly.
 
-ペンギン側からはほかに、白い腹・小さなくちばし・3 本指の水かきを取っている。
-くちばしと裂けた口が同居しているのは、キメラとしての気味悪さの一部。
+From the penguin side, I also borrowed the white belly, the small beak, and the 3-toed webbed feet. The coexistence of a beak and a split mouth is part of the uncanny quality of the chimera.
 
-## 指定への対応
+## Response to the specification
 
-| 指定 | 対応 |
+| Specification | Response |
 | --- | --- |
-| 色は紫にしない | Sui ブルー `#4DA2FF` を主色にした。輪郭は濃紺 `#0A1A2F`、腹と顔は白。ロゴと同じパレット |
-| 形状は一致させない | B案は縦長の涙型で耳がまっすぐ上に伸びる。こちらは**低重心で横に広い袋**、耳は**フリッパー形で左右非対称**、顔の位置も下げている |
+| Do not use purple | I used Sui blue `#4DA2FF` as the main color, with deep navy `#0A1A2F` for the outline and white for the belly and face. It uses the same palette as the logo. |
+| The shape must not match exactly | A chiibuki has a tall, teardrop shape with ears rising straight upward. This version instead uses a **low-center-of-gravity, wide bag-like body**; the ears are **flipper-shaped and asymmetrical**, and the face is positioned lower. |
 
-## 配色
+## Color palette
 
 | | |
 | --- | --- |
-| 体 | `#4DA2FF` |
-| 輪郭 | `#0A1A2F` |
-| 腹・顔 | `#FFFFFF` |
-| 舌 | `#8FD6E8` |
+| Body | `#4DA2FF` |
+| Outline | `#0A1A2F` |
+| Belly / face | `#FFFFFF` |
+| Tongue | `#8FD6E8` |
 
-ロゴ（`assets/logo/`）と同じパレットに収めてある。
+It is kept within the same palette as the logo in `assets/logo/`.
 
-## 作り方
+## How it was built
 
-輪郭線は「濃紺の太いストロークを先に敷き、その上に細い水色のストロークを重ねる」
-方式で描いている。耳・脚・水かきはこれで作っており、隣接する図形の輪郭が
-きれいに融合する。胴と顔の面は塗り＋ストロークで描いている。
+The outline is drawn by first laying down a thick deep-navy stroke and then overlaying a thin cyan stroke. This is used for the ears, legs, and webbed feet so adjacent contours blend cleanly. The body and face are filled shapes with stroke outlines.
 
-`viewBox` はインクの範囲を計測して正方形に合わせてある。
+The `viewBox` is adjusted to a square based on measured ink bounds.
 
-## 未対応
+## Exporting PNGs
 
-- 全身 1 ポーズのみ。表情差分・横向き・アニメーション用の分割はまだ無い。
-- 名前が無い。
+The SVG is the source of truth. PNGs are generated artifacts and are not tracked in git (`.gitignore` is already configured).
 
-## 出典
+```bash
+npm --prefix assets install
+npm --prefix assets run generate-png
+```
 
-- [Suica新キャラクターデザイン投票｜JR東日本](https://www.jreast.co.jp/suica-new-character-vote/)
-- [「Suica」の新キャラクターを決める投票が始まる 3案の特徴をチェック！ - ITmedia Mobile](https://www.itmedia.co.jp/mobile/articles/2609/09/news090.html)
-- [Suica新キャラ投票きょう終了「ペンギン返して」から一転 - Yahoo!ニュース エキスパート](https://news.yahoo.co.jp/expert/articles/5dea4c5bb93adf740643c325c1501017eaf9381e)
+See the “Exporting PNGs” section in `assets/logo/README.md` for details.
+
