@@ -31,11 +31,14 @@ export interface ControlState {
 /** 起動時の制御状態を URL クエリから読む */
 export function initialControl(): ControlState {
   const q = new URLSearchParams(window.location.search);
-  const mode: OpMode = q.get("mode") === "enroll" ? "enroll" : "normal";
+  const debug = q.get("debug") === "1";
+  // 顔登録は本来、利用者自身の端末で事前に行う(この端末は認証専用)。
+  // そのため登録モードは製品導線から隠し、開発時(debug=1)のみ入れる。
+  // 登録まわりの開発は face-regist ブランチで扱う。
+  const mode: OpMode = debug && q.get("mode") === "enroll" ? "enroll" : "normal";
   const t = Number(q.get("threshold"));
   const threshold =
     Number.isFinite(t) && t > 0 && t <= MAX_THRESHOLD ? t : DEFAULT_THRESHOLD;
-  const debug = q.get("debug") === "1";
   return { mode, threshold, debug };
 }
 

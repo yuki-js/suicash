@@ -230,7 +230,8 @@ export default function App() {
             </div>
 
             <p className="home__note">
-              顔の登録がお済みでない方は、係員にお声がけください。
+              顔の登録は、お手持ちの端末であらかじめお済ませください。
+              この端末は認証専用です。
             </p>
           </div>
         )}
