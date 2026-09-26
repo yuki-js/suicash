@@ -36,11 +36,7 @@
     </g>
 
     <!-- ワードマーク: Su / iC(アウトライン) / ash -->
-    <text x="13" y="27" font-family="REM, sans-serif" font-weight="605" font-size="20" font-kerning="none" style="font-variation-settings:'wght' 605;font-variant-ligatures:none">
-      <tspan fill="#0a1a2f">Su</tspan>
-      <tspan fill="#ffffff" stroke="#0a1a2f" stroke-width="0.9" stroke-linejoin="miter">iC</tspan>
-      <tspan fill="#0a1a2f">ash</tspan>
-    </text>
+    <text x="13" y="27" font-family="REM, sans-serif" font-weight="605" font-size="20" font-kerning="none" style="font-variation-settings:'wght' 605;font-variant-ligatures:none"><tspan fill="#0a1a2f">Su</tspan><tspan fill="#ffffff" stroke="#0a1a2f" stroke-width="0.9" stroke-linejoin="miter">iC</tspan><tspan fill="#0a1a2f">ash</tspan></text>
 
     <!-- マスコット。山の上に立たせる -->
     <g transform="translate(118 26) scale(0.082)">
