@@ -9,8 +9,18 @@ path = "src/main.rs"
 
 [dependencies]
 felica = { version = "1.0.3", features = ["usb"] }
+
+# Only the verifying side is used: coordinate proof → Arkworks compressed bytes
+# (accepted by sui::groth16) and the packed 96-byte public inputs. The proving
+# key never leaves the oracle.
+prover = { path = "../prover" }
+
 ureq = { version = "2", features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 hex = "0.4"
 tungstenite = "0.24"
+
+# Fresh per-session r1. The on-chain gate burns r1, so a constant challenge
+# would abort every payment after the first with gate::EReplay.
+rand = "0.8"

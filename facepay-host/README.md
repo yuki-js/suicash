@@ -69,6 +69,29 @@ Counterpart of `../face-auth-ui/src/terminal.ts`. Host → terminal sends JSON e
 | `FACEPAY_MERCHANT` | (empty) | Payment recipient (merchant). Payments disabled if unset |
 | `FACEPAY_SUI_HELPER` | sui-pay.mjs | Path to the Node helper |
 | `SUI_RPC` | publicnode testnet | Fullnode RPC (passed to the helper) |
+| `SUICASH_GATE_PKG` | (gate.json) | `felica_oracle` package ID (takes precedence over gate.json) |
+| `SUICASH_GATE_OBJ` | (gate.json) | Shared `Gate<SUICASH>` object ID (likewise) |
+
+## On-chain ZK verification
+
+Payments require the oracle's Groth16 proof. On each card tap the daemon gets an
+`attest` result, converts the coordinate-form proof to the Arkworks compressed
+bytes `sui::groth16` accepts, and keeps the resulting attestation JSON. On
+`faceOk` in payment mode it passes that JSON to `sui-pay.mjs` via
+`SUICASH_ATTESTATION`; the helper `moveCall`s
+`felica_oracle::suicash_gate::verify` at the head of the same PTB as the coin
+split and transfer. PTBs are atomic, so if the proof does not verify the whole
+transfer aborts — there is no payment path without a proof.
+
+The proof is bound to a fresh `r1` (drawn per session) and the on-chain gate
+burns it, so an attestation is single-use: the next payment requires another
+card tap. The gate lives in `gate.json` (written by
+`sui/felica_oracle/publish.sh`) or in `SUICASH_GATE_PKG` / `SUICASH_GATE_OBJ`.
+
+`testcard` inserts a simulated card with no oracle attestation, so it can show a
+balance but **payments are refused** until a real card is tapped. Existing,
+already-burned `r1` values also abort (`gate::EReplay`) — re-tap to get a fresh
+proof.
 
 ## Registration check
 
