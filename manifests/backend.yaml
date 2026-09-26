@@ -69,7 +69,6 @@ spec:
               memory: "512Mi"
               cpu: "500m"
             limits:
-              memory: "1536Mi"
               cpu: "2000m"
           # No GET /health in jsonrpsee (POST / only, GET -> 405), so
           # tcpSocket probes. Proving-key file load happens at startup
