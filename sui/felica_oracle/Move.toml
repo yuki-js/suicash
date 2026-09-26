@@ -7,5 +7,8 @@ license = "MIT"
 # Sui, MoveStdlib and friends are added implicitly by the Sui CLI; declaring
 # them here breaks dependency resolution (the repo root is not a package).
 
-[addresses]
-felica_oracle = "0x0"
+# OpenZeppelin Contracts for Sui — access control (RBAC + Auth witnesses).
+# Pinned to an audited release; the MVR slug (@openzeppelin-move/access) is the
+# preferred install, but this environment has no `mvr` resolver, so pin via git.
+# See README "Dependencies" for the MVR equivalent and audit scope.
+openzeppelin_access = { git = "https://github.com/OpenZeppelin/contracts-sui.git", subdir = "contracts/access", rev = "v1.5.1" }

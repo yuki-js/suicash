@@ -16,6 +16,16 @@
 /// Every one of these is *verifier* policy. The oracle is stateless and
 /// enforces none of them, so a deployment that skips this module has no
 /// replay protection at all.
+///
+/// ## Access control
+///
+/// The admin mutators (`create`, `share`, `allow`, `disallow`,
+/// `set_max_clock_drift_seconds`) are `public(package)`: only modules in this
+/// package — in practice `felica_oracle::suicash_gate`, which gates them behind
+/// OpenZeppelin `access_control` `Auth` witnesses — can call them. They are not
+/// reachable from a PTB or another package, so a stranger cannot narrow or
+/// widen a shared gate. The payment path (`verify_and_claim`) and the read-only
+/// views stay `public`: any payer must be able to spend one attestation.
 module felica_oracle::gate;
 
 use felica_oracle::felica_auth::{Self, Attestation};
@@ -54,12 +64,15 @@ public struct Gate<phantom Key: drop> has key {
 
 /// Create a gate.
 ///
+/// Package-scoped: call through `suicash_gate::create_gate`, which requires an
+/// OpenZeppelin root `Auth`. Direct creation from a PTB is not possible.
+///
 /// * `vk_bytes` — Arkworks canonical compressed verifying key (360 bytes for
 ///   this circuit: 264 + 3 scalars of 32).
 /// * `allowlist` — IDi values to accept. Pass an empty vector to accept any
 ///   card; adding an entry later permanently narrows the gate to that list.
 /// * `max_clock_drift_seconds` — bound for the coarse `attested_at` check.
-public fun create<Key: drop>(
+public(package) fun create<Key: drop>(
     vk_bytes: vector<u8>,
     allowlist: vector<vector<u8>>,
     max_clock_drift_seconds: u64,
@@ -112,29 +125,37 @@ public fun verify_and_claim<Key: drop>(
 
 /// Share a gate, making it the deployment's public verification point.
 ///
-/// Lives here and not in a caller because `Gate` has `key` without `store`,
-/// so `transfer::share_object` is only callable from this module. Sharing is
-/// the intended topology: every payer must be able to burn `r1` values in
-/// the *same* dedup store, or replay protection fragments per owner.
-public fun share<Key: drop>(gate: Gate<Key>) {
+/// Package-scoped for the same reason as `create`: lives here and not in a
+/// caller because `Gate` has `key` without `store`, so `share_object` is only
+/// callable from this module, and `public(package)` keeps it out of PTBs.
+/// Sharing is the intended topology: every payer must be able to burn `r1`
+/// values in the *same* dedup store, or replay protection fragments per owner.
+public(package) fun share<Key: drop>(gate: Gate<Key>) {
     transfer::share_object(gate)
 }
 
 /// Add an IDi to the allowlist, and narrow the gate to exactly the list.
 ///
+/// Package-scoped: call through `suicash_gate::allow`, which requires an
+/// OpenZeppelin `Operator` `Auth`. Without this, any stranger could narrow a
+/// shared gate (griefing) from a PTB.
+///
 /// Clearing `allow_any` here is the point: once a deployment has expressed a
 /// preference, "no preference" is no longer reachable.
-public fun allow<Key: drop>(gate: &mut Gate<Key>, idi: vector<u8>) {
+public(package) fun allow<Key: drop>(gate: &mut Gate<Key>, idi: vector<u8>) {
     gate.allow_any = false;
     gate.allowlist.push_back(idi);
 }
 
 /// Remove an IDi from the allowlist.
 ///
+/// Package-scoped: call through `suicash_gate::disallow`, which requires an
+/// OpenZeppelin `Operator` `Auth`.
+///
 /// Aborts if the IDi was not listed, rather than silently succeeding: a
 /// `disallow` that quietly does nothing is a revocation that reads as applied.
 /// Removing the last entry leaves the gate closed, not open — see `allow_any`.
-public fun disallow<Key: drop>(gate: &mut Gate<Key>, idi: vector<u8>) {
+public(package) fun disallow<Key: drop>(gate: &mut Gate<Key>, idi: vector<u8>) {
     let mut i = 0;
     while (i < gate.allowlist.length()) {
         if (gate.allowlist[i] == idi) {
@@ -151,6 +172,19 @@ public fun is_seen<Key: drop>(gate: &Gate<Key>, r1: vector<u8>): bool {
     table::contains(&gate.seen, r1)
 }
 
+/// Retune the coarse `attested_at` drift bound.
+///
+/// Package-scoped: call through `suicash_gate::set_max_clock_drift_seconds`,
+/// which requires an OpenZeppelin `Operator` `Auth`. The bound covers the gap
+/// between the card tap and the payment settling, so it needs to move with
+/// operations, but never from a PTB stranger.
+public(package) fun set_max_clock_drift_seconds<Key: drop>(
+    gate: &mut Gate<Key>,
+    seconds: u64,
+) {
+    gate.max_clock_drift_seconds = seconds;
+}
+
 /// Is `idi` admitted by this gate?
 ///
 /// Reads the gate's own policy, which is what callers usually want.
@@ -160,6 +194,11 @@ public fun is_idi_allowed<Key: drop>(gate: &Gate<Key>, idi: vector<u8>): bool {
 
 /// Does this gate admit any IDi at all?
 public fun is_open<Key: drop>(gate: &Gate<Key>): bool { gate.allow_any }
+
+/// The largest tolerated `|attested_at - now|`, in seconds.
+public fun max_clock_drift_seconds<Key: drop>(gate: &Gate<Key>): u64 {
+    gate.max_clock_drift_seconds
+}
 
 /// The admission rule: open gates admit everything, closed gates admit only
 /// what is listed.

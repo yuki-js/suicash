@@ -19,5 +19,11 @@ deps = { MoveStdlib = "MoveStdlib" }
 [pinned.testnet.felica_oracle]
 source = { root = true }
 use_environment = "testnet"
+manifest_digest = "8BC8DBC16621680C7D19A4DA493CCC7EEE3FAAF9A7C79374B2C7B4BD9E5E6E9A"
+deps = { openzeppelin_access = "openzeppelin_access", std = "MoveStdlib", sui = "Sui" }
+
+[pinned.testnet.openzeppelin_access]
+source = { git = "https://github.com/OpenZeppelin/contracts-sui.git", subdir = "contracts/access", rev = "7df93575119fd4e4c6f1ce23f9f6bba85fb2b3cc" }
+use_environment = "testnet"
 manifest_digest = "5745706258F61D6CE210904B3E6AE87A73CE9D31A6F93BE4718C442529332A87"
 deps = { std = "MoveStdlib", sui = "Sui" }
