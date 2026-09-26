@@ -1,0 +1,31 @@
+# FeliCa オラクル(server クレート)を Debian で常駐させる systemd ユニット。
+# 設置: /etc/systemd/system/felica-oracle.service
+#
+# 前提:
+#   - リポジトリを /opt/suicash に clone(-b usb-poc)
+#   - cargo build --release --manifest-path server/Cargo.toml --bin oracle 済み
+#   - 鍵は /etc/felica-oracle/keys.json(mode 600)に配置(リポジトリに入れない)
+#
+# パス/ユーザーは環境に合わせて書き換えること。
+[Unit]
+Description=FeliCa IDi oracle (challenge/settle/attest)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=felica
+WorkingDirectory=/opt/suicash
+# 127.0.0.1 のみで待受(公開は cloudflared 経由。直接ポートは開けない)
+Environment=FELICA_BIND_ADDR=127.0.0.1:3000
+Environment=FELICA_PROVING_KEY_PATH=/opt/suicash/prover/assets/proving_key.bin
+# 鍵はファイル参照(mode 600 の Secret)。JSON を環境変数に直書きしない。
+Environment=FELICA_KEYS_JSON_FILE=/etc/felica-oracle/keys.json
+ExecStart=/opt/suicash/server/target/release/oracle
+Restart=always
+RestartSec=3
+# 証明生成は ~500MB/1回。メモリに余裕を持たせる(足りないと attest で落ちる)
+# MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

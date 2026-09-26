@@ -1,0 +1,13 @@
+{
+  "name": "suicash-assets",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "SuiCash asset helpers (SVG -> PNG rasterization)",
+  "scripts": {
+    "generate-png": "node generate-png.mjs"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

@@ -1,0 +1,70 @@
+name: Deploy regist-web to GitHub Pages
+
+# main の regist-web/** に push(またはマージ)されると、Actions がビルドして
+# GitHub Pages に公開する(HTTPS 付き = カメラ OCR も動く)。
+# main はデフォルトブランチなので github-pages 環境の既定ポリシーで許可され、
+# 環境のブランチ保護設定を触らずにデプロイできる。
+# 公開 URL: https://yuki-js.github.io/suicash/
+on:
+  push:
+    branches: [main]
+    paths:
+      - "regist-web/**"
+      - ".github/workflows/pages-regist-web.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Pages への同時デプロイは 1 本に(進行中はキャンセルせず順番待ち)
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: regist-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: regist-web/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Build
+        # チャージのトレジャリー鍵や RPC/faucet はビルド時に埋め込める
+        # (GitHub → Settings → Secrets and variables → Actions)。
+        # 省略時は実行時の URL クエリ(?treasury=/?rpc=/?faucet=)注入でも可。
+        env:
+          VITE_TREASURY_SECRET: ${{ secrets.VITE_TREASURY_SECRET }}
+          VITE_SUI_RPC: ${{ vars.VITE_SUI_RPC }}
+          VITE_SUI_FAUCET: ${{ vars.VITE_SUI_FAUCET }}
+        run: npm run build
+
+      - name: SPA fallback + disable Jekyll
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: regist-web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

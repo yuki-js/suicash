@@ -27,13 +27,11 @@ spec:
 
   initContainers:
     - name: prepare-home
-      # Pinned by digest: ":latest" is only re-tagged by a build on main, so the
-      # tag can still point at an older image than this commit. A digest names
-      # exactly the build this manifest was validated against.
-      image: ghcr.io/yuki-js/suicash@sha256:0e9232ee433353fde3ce1010174838a0009ae21b4d4ca2bbb10d8b40273e33ca
-      # A digest is immutable, so re-resolving the tag would be pure overhead.
-      # This also keeps the Pod spec stable: imagePullPolicy is immutable on a
-      # running Pod and would otherwise break every future apply.
+      # Pinned by digest. Bump this in the same PR that needs a new image; CI
+      # only re-tags ":latest" on a build, so the tag can otherwise point at an
+      # older build than this manifest. Pinning also keeps the Pod spec stable:
+      # "image" and "imagePullPolicy" are immutable on a running Pod.
+      image: ghcr.io/yuki-js/suicash@sha256:67f3be5ddd44aaf9aa960c7406b40648b18405d4a3d3ef2fb2f4af0c36465939
       imagePullPolicy: IfNotPresent
       command: ["/bin/bash", "-lc"]
       args:
@@ -58,7 +56,7 @@ spec:
   containers:
     - name: suicash
       # Must match the init container exactly.
-      image: ghcr.io/yuki-js/suicash@sha256:0e9232ee433353fde3ce1010174838a0009ae21b4d4ca2bbb10d8b40273e33ca
+      image: ghcr.io/yuki-js/suicash@sha256:67f3be5ddd44aaf9aa960c7406b40648b18405d4a3d3ef2fb2f4af0c36465939
       imagePullPolicy: IfNotPresent
 
       securityContext:

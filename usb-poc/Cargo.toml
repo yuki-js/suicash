@@ -1,0 +1,46 @@
+[package]
+name = "usb-poc"
+version = "0.1.0"
+edition = "2021"
+description = "CLI proof of concept: attest a real Suica IDi against the FeliCa oracle and verify the Groth16 proof"
+license = "MIT"
+publish = false
+
+[dependencies]
+# `usb` is required for the Port-100 driver, which is what an RC-S380 speaks.
+# `default-features = false` plus the explicit feature documents that this
+# binary wants exactly one optional dependency and no more.
+felica = { version = "1.0.3", default-features = false, features = ["usb"] }
+
+# Only the verifying side is used. The proving key never leaves the oracle.
+prover = { path = "../prover" }
+
+ureq = { version = "2.10", features = ["tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+anyhow = "1"
+rand = "0.8"
+
+# 決済端末デーモン(facepay)の端末連携用 WebSocket サーバ。
+tungstenite = "0.24"
+
+[lib]
+name = "usb_poc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "usb-poc"
+path = "src/main.rs"
+
+# 決済端末の母艦デーモン: FeliCa 読取(card)+ オラクル認証(oracle)+
+# WebSocket 端末連携 + オンチェーン決済(sui-pay.mjs)+ オペレータ CLI。
+[[bin]]
+name = "facepay"
+path = "src/bin/facepay.rs"
+
+# The RC-S634/UA (054c:06c2) is the embedded-module variant of the RC-S380 and
+# speaks the same Port-100 protocol, but upstream felica 1.0.3 only lists
+# 06c1/06c3. The vendored copy adds 06c2 to the port100 PID list.
+[patch.crates-io]
+felica = { path = "vendor/felica" }

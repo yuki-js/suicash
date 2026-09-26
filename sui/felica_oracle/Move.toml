@@ -1,0 +1,11 @@
+[package]
+name = "felica_oracle"
+edition = "2024"
+license = "MIT"
+
+[dependencies]
+# Sui, MoveStdlib and friends are added implicitly by the Sui CLI; declaring
+# them here breaks dependency resolution (the repo root is not a package).
+
+[addresses]
+felica_oracle = "0x0"

@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: felica-oracle
+  labels:
+    app: felica-oracle
+    component: backend
+    name: backend
+    environment: production
+spec:
+  replicas: 1
+  # Recreate: single Groth16 prove peaks ~500MB; avoid 2 pods doubling RAM.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: felica-oracle
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: felica-oracle
+        component: backend
+        name: backend
+        environment: production
+    spec:
+      imagePullSecrets:
+        - name: github-registry-secret
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+      containers:
+        - name: backend
+          image: ghcr.io/yuki-js/suicash/oracle:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          env:
+            - name: FELICA_KEYS_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: oracle-secret
+                  key: keys.json
+            - name: FELICA_BIND_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  name: oracle-config
+                  key: bind-addr
+            - name: FELICA_PROVING_KEY_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: oracle-config
+                  key: proving-key-path
+            - name: RUST_LOG
+              value: info
+          # No GET /health in jsonrpsee (POST / only, GET -> 405), so
+          # tcpSocket probes. Proving-key file load happens at startup
+          # before listen; startupProbe covers it.
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          startupProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 0
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: felica-oracle
+  labels:
+    app: felica-oracle
+    component: backend
+    name: backend
+    environment: production
+spec:
+  type: ClusterIP
+  selector:
+    app: felica-oracle
+    component: backend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
