@@ -58,8 +58,12 @@ public class MainActivity extends Activity {
     private WebView web;
     private CameraHost cameraHost;
     private final SafrEngine engine = new SafrEngine();
+    /** 上部 RGB LED(SmartETK GPIO) */
+    private final LedController led = new LedController();
     /** エンジン呼び出しは単一スレッドで直列化する */
     private final ExecutorService engineExec = Executors.newSingleThreadExecutor();
+    /** LED は SAFR と別スレッド(GPIO の遅延が SAFR を止めないように) */
+    private final ExecutorService ledExec = Executors.newSingleThreadExecutor();
     /** プレビュー push はエンジンと独立に回す */
     private final ExecutorService previewExec = Executors.newSingleThreadExecutor();
     private volatile boolean previewOn = false;
@@ -77,6 +81,8 @@ public class MainActivity extends Activity {
             boolean ok = engine.init(getApplicationContext());
             Log.i(TAG, "SafrEngine init " + (ok ? "OK" : "FAILED"));
         });
+        // LED 初期化(GPIO サービスが無ければ無効で続行)
+        ledExec.execute(led::init);
 
         FrameLayout root = new FrameLayout(this);
 
@@ -94,6 +100,7 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
 
         web.addJavascriptInterface(new SafrBridge(), "SafrNative");
+        web.addJavascriptInterface(new LedBridge(), "LedNative");
         web.setWebViewClient(new WebViewClient());
         root.addView(web, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -126,12 +133,22 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         stopPreview();
+        led.release();
         engineExec.shutdown();
+        ledExec.shutdown();
         previewExec.shutdown();
         if (web != null) {
             web.destroy();
         }
         super.onDestroy();
+    }
+
+    /** WebView から LED を制御する JS ブリッジ: window.LedNative.set("blue_blink"|"green"|"red"|"off") */
+    private class LedBridge {
+        @android.webkit.JavascriptInterface
+        public void set(final String mode) {
+            ledExec.execute(() -> led.setByName(mode));
+        }
     }
 
     // ---------------------------------------------------------- プレビュー push
