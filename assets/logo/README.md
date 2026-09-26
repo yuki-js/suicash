@@ -1,76 +1,65 @@
-# SuiCash ロゴ
+# SuiCash Logo
 
-`.opencode/skills/suicash/skill.md` のロゴ要件にもとづく。
+Based on the logo requirements in `.opencode/skills/suicash/skill.md`.
 
-| ファイル | 用途 |
+| File | Purpose |
 | --- | --- |
-| `suicash-logo.svg` | ワードマーク（737 B） |
-| `suicash-icon.svg` | アプリ／ファビコン用 512×512、`iC` のみ（682 B） |
-| `generate.py` | 上記 2 点の生成スクリプト |
-| `font/suicash-wordmark.woff2` | 自前ホスト用のサブセットフォント（1.2 KB） |
+| `suicash-logo.svg` | Wordmark (737 B) |
+| `suicash-icon.svg` | App / favicon version, 512×512, using only `iC` (682 B) |
+| `generate.py` | Script that generates the two files above |
+| `font/suicash-wordmark.woff2` | Self-hosted subset font for the wordmark (1.2 KB) |
 
-どちらの SVG もグリフのパスを持たない。`<text>` で組み、Web フォントは
-`@import` で Google Fonts から読み込む。
+Neither SVG contains glyph paths. They are composed using `<text>`, and the web font is loaded via `@import` from Google Fonts.
 
 ```xml
 <style><![CDATA[@import url('https://fonts.googleapis.com/css2?family=REM:wght@100..900');]]></style>
 <text font-family="REM" font-weight="605" style="font-variation-settings:'wght' 605">
 ```
 
-`font-variation-settings` は可変フォントを解釈するブラウザでしか効かないので、
-`font-weight` も併記している。これが無いと、画像ビューアや SVG エディタでは
-既定ウェイト（400）で細く描画される。
+`font-variation-settings` only works in browsers that support variable fonts, so `font-weight` is also included. Without it, image viewers and SVG editors will render the text at the default weight (400), which appears too thin.
 
-## 読み込み方の注意
+## Notes on loading
 
-外部フォントを参照する SVG は、**HTML にインライン展開するか、SVG を直接開いた
-ときにしかフォントが適用されない**。`<img src="...">`・CSS の `background-image`・
-favicon として使うと、ブラウザが外部リソースの読み込みを遮断するため
-フォールバック書体で描画される。その場合は次のいずれか。
+SVGs that reference external fonts will only have the font applied when they are either:
+- embedded inline in HTML, or
+- opened directly as an SVG file
 
-- `generate.py` の `FONT_SOURCE = "selfhost"` にして
-  `font/suicash-wordmark.woff2` を相対パスで参照する
-  （外部ドメインへの依存は無くなるが、`<img>` の制約は同じ）
-- 用途に応じて PNG を書き出す
-- 配布用にアウトライン化する
+If they are used as `<img src="...">`, CSS `background-image`, or favicons, browsers typically block external resource loading, so the fallback font is used instead. In that case, use one of the following:
 
-## なぜこのフォント？
+- Set `FONT_SOURCE = "selfhost"` in `generate.py` and reference `font/suicash-wordmark.woff2` via a relative path
+  (this removes the external domain dependency, but the `<img>` limitation remains the same)
+- Export the asset as PNG for the intended use case
+- Convert the text to outlines for distribution
 
-`REM` は、Google Fonts で公開されているフォントのなかで一番雰囲気がいいなって思ったからです。
+## Why this font?
 
-## 組み方
+I chose `REM` because among the fonts published on Google Fonts, it matched the intended mood the best.
 
-`SuiCash` は `Su + iC + ash` と分解でき、**なにか** のロゴが `Su + iC + a` の
-`iC` を白抜きにしているのと同じ位置関係になる。この `iC` だけを
-「白フィル + 本文色の輪郭線」で反転させ、IC カードであることを示す。
+## Composition
 
+`SuiCash` can be decomposed as `Su + iC + ash`, and it follows the same positional relationship as the reference logo where `Su + iC + a` uses the `iC` as a white-cutout. This `iC` is inverted by using a white fill with a dark outline in the primary text color, indicating that it represents an IC card.
 
-### 4. 字間
+### 4. Character spacing
 
-隣り合う文字の**インクの間隔**が上の規則どおりになるよう、
-`<tspan x="...">` で 1 文字ずつ絶対座標に置いている。
-フォント側のサイドベアリングやカーニングには依存しない。
+To make the **ink gap** between adjacent characters match the rule above, each glyph is positioned one by one using absolute coordinates with `<tspan x="...">`. This avoids dependence on the font’s side bearings or kerning.
 
-4000px でレンダリングして実測した結果、全ペアで目標値との差は
-レンダリング解像度の量子化誤差（±1px）の範囲に収まっている。
+After rendering at 4000px and measuring it, the difference from the target values for all pairs stayed within the quantization error range of the rendering resolution (±1 px).
 
-## 配色
+## Color palette
 
 | | |
 | --- | --- |
-| 濃紺（本文） | `#0A1A2F` |
-| Sui ブルー | `#4DA2FF` |
+| Deep navy (body text) | `#0A1A2F` |
+| Sui blue | `#4DA2FF` |
 
-**なにか** のグリーンではなく Sui ブルーを主色にしている。
+The primary color is Sui blue instead of the green used in the reference logo.
 
-## 既知の差異・未対応
+## Known differences / not yet addressed
 
-- 参照ロゴの `i` のドットは横長の矩形だが、REM のドットは丸い。
-  白抜きにすると輪郭線がつくぶん目立つ。数値上の一致度は最良だが、
-  この一点だけは逆方向に外れている。
-- 参照ロゴが持つステムの削ぎ落とし（前述）は再現できていない。
+- The reference logo has a horizontally elongated dot on the `i`, while REM’s dot is round. When the dot is inverted to white, the outline becomes more visible and thus more prominent. The numeric match is still the best possible, but this is the one point where it diverges in the opposite direction.
+- The stem cutaway detail in the reference logo has not been reproduced.
 
-## 再生成
+## Regenerate
 
 ```bash
 python3 -m venv venv
@@ -78,20 +67,16 @@ python3 -m venv venv
 ./venv/bin/python assets/logo/generate.py
 ```
 
-字送りの計算のために、Google Fonts から REM の可変フォントを取得する
-（`TMPDIR` にキャッシュ）。
+To calculate letter spacing, the REM variable font is fetched from Google Fonts and cached in `TMPDIR`.
 
-## PNG の書き出し
+## Exporting PNGs
 
-SVG が正本。PNG は生成物で git 管理しない（`.gitignore` 済み）。
+The SVG is the source of truth. PNGs are generated files and are not tracked in git (`.gitignore` is already configured).
 
 ```bash
 npm --prefix assets install
-npm --prefix assets run generate-png       # 2x を SVG と同名で書き出す
-node assets/generate-png.mjs --scale=3     # 倍率を変える
+npm --prefix assets run generate-png       # export 2x PNGs alongside the SVGs
+node assets/generate-png.mjs --scale=3     # change the scale factor
 ```
 
-ロゴの `<text>` は REM（wght 605）で描くため、スクリプトが
-`REM[wght].ttf` を取得して resvg に渡す。初回のみネットワークが必要
-（`TMPDIR` にキャッシュ）。手元のフォントを使う場合は
-`SUICASH_REM_TTF=/path/to/REM.ttf` を指定する。
+Because the logo text is drawn with `<text>` using REM (wght 605), the script retrieves `REM[wght].ttf` and passes it to resvg. Network access is required only on the first run (cached in `TMPDIR`). If you want to use a local font, set `SUICASH_REM_TTF=/path/to/REM.ttf`.
