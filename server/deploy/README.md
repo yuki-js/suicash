@@ -40,8 +40,15 @@ sudo mkdir -p /etc/felica-oracle
 sudo tee /etc/felica-oracle/keys.json >/dev/null <<'JSON'
 {"gsk":"<16hex>","usk":"<16hex>","system_code":3,"areas":[0,64,2048,4032,4096],"services":[74]}
 JSON
+# サービス実行ユーザー(felica)が読めるよう所有者を合わせる。
+# root 所有 + mode 600 のままだと "Permission denied (os error 13)" で起動失敗する。
+sudo chown felica:felica /etc/felica-oracle/keys.json
 sudo chmod 600 /etc/felica-oracle/keys.json
 ```
+
+> /opt/suicash を root で clone した場合、felica ユーザーが proving key や
+> バイナリを読めず同じ 13 が出ることがある。その時は:
+> `sudo chmod -R a+rX /opt/suicash` (少なくとも prover/assets と server/target/release)。
 
 動作確認だけなら fixture 鍵(`server/src/oracle/fixture.rs`。`rpc_attest` 例が
 正確な JSON を出力)を使う。
