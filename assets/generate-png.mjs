@@ -1,10 +1,11 @@
 // Exports SuiCash asset SVGs to PNG.
 //
 //   npm --prefix assets install
-//   npm --prefix assets run generate-png [-- --scale=2]
+//   npm --prefix assets run generate-png [-- --2x|--4x|--8x]
 //
 // Writes a *.png next to each *.svg under assets/ (SVGs are the source of truth; PNGs are
 // generated and not tracked in git). Rasterized with resvg (Rust, no native deps).
+// The output filename is always *.png regardless of the scale option.
 //
 // The logo SVG's <text> is set in the REM variable font (wght 605), so REM[wght].ttf is
 // fetched from the Google Fonts repository and passed to resvg.
@@ -21,12 +22,42 @@ const REM_URL =
   "https://raw.githubusercontent.com/google/fonts/main/ofl/rem/REM%5Bwght%5D.ttf";
 const FONT_CACHE = path.join(tmpdir(), "suicash-REM-wght.ttf");
 
-const scaleArg = process.argv.find((a) => a.startsWith("--scale="));
-const SCALE = scaleArg ? Number(scaleArg.split("=")[1]) : 2;
-if (!Number.isFinite(SCALE) || SCALE <= 0) {
-  console.error("usage: node generate-png.mjs [--scale=2]");
-  process.exit(1);
+const SCALE_FLAGS = { "--2x": 2, "--4x": 4, "--8x": 8 };
+const ALLOWED_SCALES = [2, 4, 8];
+
+function parseScale(argv) {
+  const usage = `usage: node generate-png.mjs [--2x|--4x|--8x|--scale=${ALLOWED_SCALES.join("|")}] (default: --2x)`;
+  const flags = argv.filter((a) => a in SCALE_FLAGS);
+  const scaleArg = argv.find((a) => a.startsWith("--scale="));
+  const known = new Set(Object.keys(SCALE_FLAGS));
+  const unknown = argv.filter((a) => !known.has(a) && !a.startsWith("--scale="));
+  if (unknown.length > 0) {
+    console.error(usage);
+    console.error(`unknown option: ${unknown.join(", ")}`);
+    process.exit(1);
+  }
+  if (flags.length > 1) {
+    console.error(`usage: node generate-png.mjs [--2x|--4x|--8x|--scale=${ALLOWED_SCALES.join("|")}] (default: --2x)`);
+    console.error(`multiple scale options: ${flags.join(", ")}`);
+    process.exit(1);
+  }
+  if (flags.length === 1 && scaleArg) {
+    console.error(`usage: node generate-png.mjs [--2x|--4x|--8x|--scale=${ALLOWED_SCALES.join("|")}] (default: --2x)`);
+    console.error(`cannot combine ${flags[0]} with ${scaleArg}`);
+    process.exit(1);
+  }
+  if (flags.length === 1) return SCALE_FLAGS[flags[0]];
+  if (!scaleArg) return 2;
+  const value = Number(scaleArg.split("=")[1]);
+  if (!ALLOWED_SCALES.includes(value)) {
+    console.error(`usage: node generate-png.mjs [--2x|--4x|--8x|--scale=${ALLOWED_SCALES.join("|")}] (default: --2x)`);
+    console.error(`unsupported scale: ${scaleArg} (allowed: ${ALLOWED_SCALES.join(", ")})`);
+    process.exit(1);
+  }
+  return value;
 }
+
+const SCALE = parseScale(process.argv.slice(2));
 
 function isFont(buf) {
   if (buf.length < 4) return false;
