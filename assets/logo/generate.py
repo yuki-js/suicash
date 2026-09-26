@@ -39,7 +39,6 @@ GF_CSS = ("https://fonts.googleapis.com/css2?family=REM:"
           "wght@100..900&display=block")
 FAMILY = "SuiCash Wordmark"            # selfhost のときのファミリー名
 
-# 参照ロゴ（JR東日本 Suica）の実測値。キャップハイト = 1.0 で正規化したもの。
 # 4000px でラスタライズして画素単位で計測した。参照ロゴのパスは使っていない。
 MEASURED = {
     "x_height": 0.711,      # x-ハイト
