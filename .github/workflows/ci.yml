@@ -142,8 +142,10 @@ jobs:
           version=$(curl -sL -o /dev/null -w '%{url_effective}' \
             https://github.com/MystenLabs/sui/releases/latest | sed 's|.*/tag/||')
           echo "installing sui $version"
+          # Extract outside the checkout: the tarball's ./sui binary collides with the repo's sui/ dir.
+          mkdir -p "$RUNNER_TEMP/sui"
           curl -sL "https://github.com/MystenLabs/sui/releases/download/${version}/sui-${version}-ubuntu-x86_64.tgz" \
-            | tar xz
+            | tar xz -C "$RUNNER_TEMP/sui"
           echo "$RUNNER_TEMP/sui" >> "$GITHUB_PATH"
 
       - name: Reproduce the committed fixture from the committed key
