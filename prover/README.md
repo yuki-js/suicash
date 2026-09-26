@@ -177,3 +177,12 @@ stopped verifying anything looks exactly like a passing test.
 
 `setup.rs` and the two binaries are near-verbatim from the reference; the
 substantive changes are confined to `abi.rs`, `circuit.rs` and `lib.rs`.
+
+# Attribution
+
+This submodule is partly based on my previous work. 
+https://github.com/yuki-js/felica-oracle
+
+But it has been rewritten and modified to fit the Sui Move environment, with a focus on reducing public inputs and improving the prover's efficiency. The original implementation served as a reference point for understanding the FeliCa DES oracle prover, but this crate represents a new approach to attestation at the IDi level.
+
+The previous work has finished before the hackathon starts. And it is not a part of the hackathon submission. It's just for proving the concept of "Is FeliCa's mutual authentication protocol given as a zkp constraint system?" .
