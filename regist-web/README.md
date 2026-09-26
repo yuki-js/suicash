@@ -12,45 +12,36 @@ npm run build    # 型チェック + 本番ビルド
 
 ## デプロイ
 
-`npm run build` の出力 `dist/` は**純粋な静的サイト**(相対パス出力)。
-サーバープロセスは不要で、置き方は 3 通りある。用途に合わせて選ぶ。
+### 本番: GitHub Pages(自動デプロイ)
 
-### 方法 A(推奨): 静的ホスティング
-
-Cloudflare Pages / GitHub Pages / Netlify / Vercel などに `dist/` を上げる。
+`face-regist` の `regist-web/**` に push すると、Actions
+(`.github/workflows/pages-regist-web.yml`)がビルドして GitHub Pages に公開する。
 **HTTPS が自動で付く**ので、スマホの券面カメラ OCR(`getUserMedia` は
-secure context 必須)がそのまま動く。Docker もサーバー常駐も要らない。
+secure context 必須)もそのまま動く。サーバー・Docker・SSH は不要。
 
-- ビルドコマンド: `npm ci && npm run build`
-- 公開ディレクトリ: `dist`
-- SPA フォールバック: 404 → `/index.html`(各ホストの設定で指定)
+- 公開 URL: **https://yuki-js.github.io/suicash/**
+- 初回のみ GitHub 側で有効化: Settings → Pages → Build and deployment →
+  **Source: GitHub Actions**
+- `face-regist`(デフォルトブランチ以外)から公開するため、環境
+  `github-pages` の保護ルールでこのブランチのデプロイが弾かれる場合は、
+  Settings → Environments → github-pages → Deployment branches に
+  `face-regist` を許可する(または main にマージ)
+- トレジャリー鍵 / RPC / faucet を埋め込むなら Settings → Secrets and
+  variables → Actions に `VITE_TREASURY_SECRET`(Secret)、
+  `VITE_SUI_RPC` / `VITE_SUI_FAUCET`(Variables)を設定
+- 相対パス出力(`base: "./"`)なのでサブパス `/suicash/` 配下で動く。
+  SPA フォールバック用に `404.html` と `.nojekyll` はワークフローが生成する
 
-### 方法 B: Node のある任意サーバー(Docker 不要・ポート 1919)
-
-```sh
-npm ci && npm run build
-npm start          # = vite preview --host --port 1919
-# → http://<サーバー>:1919
-```
-
-### 方法 C: 既存の Web サーバー(nginx / caddy 等)で配信
-
-`dist/` をドキュメントルートに置き、SPA フォールバック(全パス → index.html)
-を設定するだけ。`nginx.conf`(ポート 1919・フォールバック済み)を同梱している。
-
-### 方法 D: Docker(使える環境なら)
+### ローカル確認
 
 ```sh
-docker build -t suicash-regist-web .
-docker run --rm -p 1919:1919 suicash-regist-web
+npm run dev        # 開発サーバ(HMR、:5173)
+npm run preview    # 本番ビルドの確認(:4173)
 ```
 
 > **カメラ読み取りの注意**: 券面 OCR は `getUserMedia` を使うため
-> **secure context(HTTPS または localhost)必須**。平文 HTTP の
-> `http://<IP>:1919` をスマホで開くとカメラは使えない(手入力は動く)。
-> スマホでカメラ OCR を使うなら方法 A の HTTPS ホスティングが最も簡単。
-> 自前サーバーで HTTP しか無い場合は Caddy 等でリバースプロキシして
-> HTTPS を付けるか、手入力で運用する。
+> **secure context(HTTPS または localhost)必須**。GitHub Pages は HTTPS
+> なので問題ない。ローカルは `http://localhost` なら可(LAN の IP 平文は不可)。
 
 ## 登録フロー
 
