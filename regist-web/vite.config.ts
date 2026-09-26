@@ -8,5 +8,9 @@ export default defineConfig({
   preview: {
     port: 1919,
     host: true,
+    // リバースプロキシ(Let's Encrypt 自動)配下の任意ホスト名でアクセスできるよう
+    // ホストチェックを無効化する。vite preview は簡易サーバーで、front には
+    // 別途 TLS プロキシが立つ運用のため。
+    allowedHosts: true,
   },
 });
