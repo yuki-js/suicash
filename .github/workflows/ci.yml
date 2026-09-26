@@ -118,18 +118,27 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      # Single source of truth for the image name. manifests/backend.yaml and
+      # manifests/kustomization.yaml must reference the same string, or the
+      # Deployment will pull something this pipeline never published.
+      REGISTRY: ghcr.io
+      IMAGE_NAME: yuki-js/suicash/oracle
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
+      # Built and smoke-tested locally BEFORE anything is published, so a broken
+      # image cannot reach the registry. The reference pushed first and only
+      # then tested the pushed tag.
       - name: Build image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: server/Dockerfile
           load: true
-          tags: felica-ida-oracle:ci
+          tags: felica-oracle:ci
           # Only linux/amd64, matching the runners and avoiding a QEMU arm64
           # Rust build, which is prohibitively slow.
           platforms: linux/amd64
@@ -137,13 +146,13 @@ jobs:
           cache-to: type=gha,mode=max
 
       # Proves the image starts, deserializes the baked key, and serves real
-      # JSON-RPC — not merely that the build succeeded.
+      # JSON-RPC - not merely that the build succeeded.
       - name: Smoke test
         run: |
           set -euo pipefail
           docker run -d --name oracle-ci -p 3000:3000 \
             -e FELICA_KEYS_JSON='{"gsk":"4abbe342d26c64f1","usk":"53af2483920bf339","system_code":3,"areas":[64],"services":[72]}' \
-            felica-ida-oracle:ci
+            felica-oracle:ci
           trap 'docker logs oracle-ci || true; docker rm -f oracle-ci || true' EXIT
 
           for i in $(seq 1 45); do
@@ -171,3 +180,29 @@ jobs:
       - name: Build log
         if: always()
         run: docker logs oracle-ci || true
+
+      - name: Log in to GHCR
+        # GITHUB_TOKEN is scoped to this repository and this run, so there is no
+        # long-lived registry credential to leak. The package must be public, or
+        # the cluster needs an imagePullSecret (manifests/backend.yaml already
+        # references `github-registry-secret`).
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish
+        run: |
+          set -euo pipefail
+          IMAGE="${REGISTRY}/${IMAGE_NAME}"
+          # `:latest` is what manifests/backend.yaml pins, so it has to exist or
+          # the Deployment cannot pull.
+          docker tag felica-oracle:ci "${IMAGE}:latest"
+          # Immutable per-commit tag. `:latest` is mutable by nature, so this is
+          # the only way back to a known-good build.
+          docker tag felica-oracle:ci "${IMAGE}:sha-${GITHUB_SHA}"
+          docker push "${IMAGE}:latest"
+          docker push "${IMAGE}:sha-${GITHUB_SHA}"
+          echo "published ${IMAGE}:latest"
+          echo "published ${IMAGE}:sha-${GITHUB_SHA}"
