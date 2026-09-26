@@ -1,9 +1,9 @@
 /**
- * SuiCash prepaid card face. Original design in the style of a transit IC card.
- * - Silver background; the polygonal mountains at the bottom use the theme color (aqua, #4DA2FF family)
- * - Wordmark set the same way as assets/logo/suicash-logo.svg (REM 605, only iC outlined)
- * - Mascot is assets/mascot/suicash-mascot.svg inlined and scaled down
- *   (loading external SVG via <img> blocks web fonts, so everything is inlined)
+ * Card face of the SuiCash prepaid card. Same design as assets/card/suicash-card.svg.
+ * - Silver background with a trapezoidal panel in the theme color (aqua, #4DA2FF family) on the left
+ * - Wordmark at the panel's bottom left, set the same way as assets/logo/suicash-logo.svg (REM 605, only iC outlined)
+ * - Mascot is assets/mascot/suicash-mascot.svg, inlined and scaled down
+ *   (everything is inlined because loading an external SVG via <img> blocks web fonts)
  */
 export function SuiCashCard({ className }: { className?: string }) {
   return (
@@ -14,14 +14,13 @@ export function SuiCashCard({ className }: { className?: string }) {
       aria-label="SuiCash card"
     >
       <defs>
-        <linearGradient id="scCardBody" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0" stopColor="#f7fafc" />
-          <stop offset="0.55" stopColor="#e3e9ef" />
-          <stop offset="1" stopColor="#cdd6de" />
+        <linearGradient id="scSilver" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f8f9f8" />
+          <stop offset="1" stopColor="#e2e6e4" />
         </linearGradient>
-        <linearGradient id="scChip" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#e8c96a" />
-          <stop offset="1" stopColor="#c9a13e" />
+        <linearGradient id="scAqua" x1="0" y1="0" x2="0.5" y2="1">
+          <stop offset="0" stopColor="#5cb0ff" />
+          <stop offset="1" stopColor="#3d95f5" />
         </linearGradient>
         <clipPath id="scCardClip">
           <rect x="0" y="0" width="172" height="108" rx="9" />
@@ -29,61 +28,20 @@ export function SuiCashCard({ className }: { className?: string }) {
       </defs>
 
       <g clipPath="url(#scCardClip)">
-        <rect x="0" y="0" width="172" height="108" fill="url(#scCardBody)" />
+        {/* Base (silver) */}
+        <rect x="0" y="0" width="172" height="108" fill="url(#scSilver)" />
 
-        {/* Polygonal mountain range at the bottom, faceted in the aqua theme color */}
-        <g>
-          <polygon
-            points="0,70 30,52 60,66 94,46 126,62 172,42 172,108 0,108"
-            fill="#4da2ff"
-          />
-          <polygon points="30,52 60,66 22,108 0,108 0,70" fill="#2f6fb8" />
-          <polygon points="94,46 126,62 96,108 56,108" fill="#6cb4ff" />
-          <polygon points="126,62 172,42 172,108 140,108" fill="#2f6fb8" />
-          {/* White wave across the mountains */}
-          <path
-            d="M-4,82 C30,72 62,92 98,78 C126,68 152,80 176,72"
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth="3.4"
-            strokeLinecap="round"
-            opacity="0.92"
-          />
-        </g>
+        {/* Trapezoidal panel (theme-color aqua) */}
+        <path
+          d="M 12 7 H 76 Q 80 7 81.2 10.8 L 108.8 98.2 Q 110 102 106 102 H 12 Q 7 102 7 97 V 12 Q 7 7 12 7 Z"
+          fill="url(#scAqua)"
+        />
 
-        {/* IC chip */}
-        <g>
-          <rect x="14" y="38" width="21" height="16" rx="2.5" fill="url(#scChip)" />
-          <path
-            d="M14 44 h21 M14 49 h21 M21 38 v16 M28 38 v16"
-            stroke="#8f742c"
-            strokeWidth="0.8"
-            fill="none"
-          />
-        </g>
+        {/* Insertion-direction mark, top left */}
+        <path d="M 15 2.2 L 10.4 4.3 L 15 6.4 Z" fill="#0a1a2f" opacity="0.7" />
 
-        {/* Wordmark: Su / iC (outlined) / ash */}
-        <text
-          x="13"
-          y="27"
-          fontFamily="REM, sans-serif"
-          fontWeight="605"
-          fontSize="20"
-          style={{
-            fontVariationSettings: "'wght' 605",
-            fontVariantLigatures: "none",
-            fontKerning: "none",
-          }}
-        >
-          <tspan fill="#0a1a2f">Su</tspan>
-          <tspan fill="#ffffff" stroke="#0a1a2f" strokeWidth="0.9" strokeLinejoin="miter">
-            iC
-          </tspan>
-          <tspan fill="#0a1a2f">ash</tspan>
-        </text>
-
-        {/* Mascot standing on the mountains */}
-        <g transform="translate(118 26) scale(0.082)">
+        {/* Mascot (embedded from assets/mascot/suicash-mascot.svg) */}
+        <g transform="translate(110 36.4) scale(0.113)">
           <g fill="none" strokeLinecap="round">
             <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" strokeWidth="78" />
             <path d="M318 204 C340 164 366 130 396 112" stroke="#0A1A2F" strokeWidth="62" />
@@ -124,6 +82,26 @@ export function SuiCashCard({ className }: { className?: string }) {
             <path d="M228 348 C238 364 258 362 266 346 Z" fill="#8FD6E8" />
           </g>
         </g>
+
+        {/* Wordmark: white, bottom left inside the trapezoidal panel (iC outlined) */}
+        <text
+          x="12"
+          y="94"
+          fontFamily="REM, sans-serif"
+          fontWeight="605"
+          fontSize="22"
+          style={{
+            fontVariationSettings: "'wght' 605",
+            fontVariantLigatures: "none",
+            fontKerning: "none",
+          }}
+        >
+          <tspan fill="#ffffff">Su</tspan>
+          <tspan fill="none" stroke="#ffffff" strokeWidth="1" strokeLinejoin="miter">
+            iC
+          </tspan>
+          <tspan fill="#ffffff">ash</tspan>
+        </text>
       </g>
 
       <rect
@@ -133,7 +111,7 @@ export function SuiCashCard({ className }: { className?: string }) {
         height="106.5"
         rx="8.5"
         fill="none"
-        stroke="rgba(10, 26, 47, 0.25)"
+        stroke="rgba(10, 26, 47, 0.28)"
         strokeWidth="1.5"
       />
     </svg>

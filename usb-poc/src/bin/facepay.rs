@@ -23,6 +23,16 @@
 //!   FACEPAY_MERCHANT  merchant address (payment recipient; payments disabled if unset)
 //!   FACEPAY_SUI_HELPER path to sui-pay.mjs (resolved automatically by default)
 //!   SUI_RPC           fullnode RPC (passed through to sui-pay.mjs)
+//!   SUICASH_GATE_PKG / SUICASH_GATE_OBJ
+//!                     on-chain ZK gate (felica_oracle package and shared
+//!                     Gate object). Passed through to sui-pay.mjs. If unset,
+//!                     gate.json next to sui-pay.mjs is used
+//!
+//! Payment flow: on card tap the oracle issues a Groth16 proof, and
+//! suicash_gate::verify checks it on-chain at the start of the payment PTB. If
+//! verification fails the whole transfer aborts (there is no payment path without
+//! a proof). The proof is bound to r1 and burned on-chain, so it is single-use;
+//! the next payment requires a re-tap.
 //!   FACEPAY_AUTOLAUNCH  terminal auto-launch (default 1; 0 disables)
 //!   FACEPAY_UI_PORT     UI server port the terminal loads (default 5173)
 //!   FACEPAY_TERMINAL_URL   URL the terminal opens (default built from UI_PORT/WS_PORT)
@@ -62,6 +72,10 @@ struct Shared {
     pay_mode: Option<u64>,
     /// IDi of the card currently shown on the terminal
     current_idi: Option<String>,
+    /// Attestation JSON of the card currently shown on the terminal (passed to sui-pay.mjs).
+    /// Single-use because the on-chain gate burns r1: it is taken when a payment
+    /// starts, and the next payment requires a card re-tap (re-attest).
+    current_att: Option<String>,
     /// Senders to every connected client (terminal + admin GUI). Broadcast to all.
     clients: Vec<(u64, Sender<String>)>,
     next_client_id: u64,
@@ -70,8 +84,6 @@ struct Shared {
     last_card_json: Option<String>,
     /// Latest payment result JSON (for the admin GUI)
     last_payment_json: Option<String>,
-    /// Payment-in-progress flag. Prevents double payments/races from repeated faceOk
-    paying: bool,
 }
 type State = Arc<Mutex<Shared>>;
 
@@ -275,21 +287,18 @@ fn handle_report(text: &str, state: &State, cfg: &Arc<Config>) {
     eprintln!("terminal → host: {t}");
     match t {
         "faceOk" => {
-            // Don't start again while paying (prevents double payment / coin races from repeated faceOk)
-            let go = {
+            // Take the attestation out (single-use, since r1 is burned on-chain).
+            // Leave it in place when not entering a payment.
+            let job = {
                 let mut s = state.lock().unwrap();
-                if s.paying {
-                    None
-                } else if let (Some(amount), Some(idi)) = (s.pay_mode, s.current_idi.clone()) {
-                    s.paying = true;
-                    Some((amount, idi))
-                } else {
-                    None
+                match (s.pay_mode, s.current_idi.clone()) {
+                    (Some(amount), Some(idi)) => Some((amount, idi, s.current_att.take())),
+                    _ => None,
                 }
             };
-            if let Some((amount, idi)) = go {
+            if let Some((amount, idi, att)) = job {
                 let (state, cfg) = (state.clone(), cfg.clone());
-                thread::spawn(move || run_payment(&state, &cfg, &idi, amount));
+                thread::spawn(move || run_payment(&state, &cfg, &idi, amount, att));
             }
         }
         // Operator commands from the admin GUI {"type":"op","cmd":"pay"|"idle"|"status","amount":<MIST>}
@@ -322,26 +331,32 @@ fn set_pay_mode(state: &State, mist: Option<u64>) {
     broadcast_status(state);
 }
 
-/// Executes the payment (transfer) and returns paymentResult to the terminal
-fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
+/// Executes the payment (transfer) and returns paymentResult to the terminal.
+///
+/// The attestation's Groth16 proof is verified on-chain at the start of the
+/// transfer PTB (felica_oracle::suicash_gate::verify). If the proof fails the
+/// whole transfer aborts, so no payment path bypasses ZK verification.
+fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64, att: Option<String>) {
     if cfg.merchant.is_empty() {
-        emit_payment(state, false, r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"Merchant address not set"}"#.to_string());
+        emit_payment(state, r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"Merchant address not set"}"#.to_string());
         return;
     }
-    // Check the balance before transferring; if short, report "Insufficient balance".
-    // Sui charges gas even for failed txs, so if the balance can't cover amount + gas
-    // reserve, reject without sending (avoids burning gas: failed yet balance drops).
-    const GAS_RESERVE_MIST: u128 = 20_000_000; // matches the gas budget in sui-pay.mjs
+    let Some(att) = att else {
+        emit_payment(state, format!(
+            r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"0","error":"No attestation. Please tap your card again"}}"#
+        ));
+        return;
+    };
+    // Check the balance before transferring; if short, report "Insufficient balance"
     let bal = sui_helper(cfg, &["balance", idi]);
     let balance: u128 = bal
         .get("balance")
         .and_then(|x| x.as_str())
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
-    if balance < amount as u128 + GAS_RESERVE_MIST {
+    if balance < amount as u128 {
         emit_payment(
             state,
-            false,
             format!(
                 r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"{balance}","error":"Insufficient balance"}}"#
             ),
@@ -349,7 +364,11 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
         return;
     }
 
-    let res = sui_helper(cfg, &["pay", idi, &amount.to_string(), &cfg.merchant]);
+    let res = sui_helper_env(
+        cfg,
+        &["pay", idi, &amount.to_string(), &cfg.merchant],
+        &[("SUICASH_ATTESTATION", &att)],
+    );
     let ok = res.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
     let msg = if ok {
         let after = res.get("balanceAfter").and_then(|x| x.as_str()).unwrap_or("0");
@@ -358,7 +377,6 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
     } else {
         // Map every transfer failure to a user-facing message; gas/balance shortfall -> "Insufficient balance"
         let raw = res.get("error").and_then(|x| x.as_str()).unwrap_or("");
-        eprintln!("payment helper failed (raw error): {raw}");
         let jp = if raw.to_lowercase().contains("insufficient")
             || raw.to_lowercase().contains("gas")
             || raw.to_lowercase().contains("balance")
@@ -371,32 +389,30 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
             r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"{balance}","error":"{jp}"}}"#
         )
     };
-    emit_payment(state, ok, msg);
+    emit_payment(state, msg);
 }
 
-/// Broadcasts the payment result and clears the in-progress flag.
-/// On success, consumes the pending payment (must be re-armed for the next customer) to prevent double payment.
-fn emit_payment(state: &State, ok: bool, json: String) {
-    {
-        let mut s = state.lock().unwrap();
-        s.last_payment_json = Some(json.clone());
-        s.paying = false;
-        if ok {
-            s.pay_mode = None;
-        }
-    }
+/// Broadcasts the payment result and keeps it for redisplay in the admin GUI
+fn emit_payment(state: &State, json: String) {
+    state.lock().unwrap().last_payment_json = Some(json.clone());
     send_terminal(state, json);
-    if ok {
-        // On success, return to balance inquiry mode (both terminal and GUI)
-        send_terminal(state, mode_json(None));
-    }
-    broadcast_status(state);
 }
 
 // ------------------------------------------------------------- sui-pay.mjs calls
 
 fn sui_helper(cfg: &Config, args: &[&str]) -> serde_json::Value {
-    match Command::new("node").arg(&cfg.sui_helper).args(args).output() {
+    sui_helper_env(cfg, args, &[])
+}
+
+/// Calls sui-pay.mjs with extra environment variables. The attestation is passed
+/// via env because as an argument it would be exposed in ps and hit length limits.
+fn sui_helper_env(cfg: &Config, args: &[&str], envs: &[(&str, &str)]) -> serde_json::Value {
+    let mut cmd = Command::new("node");
+    cmd.arg(&cfg.sui_helper).args(args);
+    for (k, v) in envs {
+        cmd.env(k, v);
+    }
+    match cmd.output() {
         Ok(o) => {
             let s = String::from_utf8_lossy(&o.stdout);
             serde_json::from_str(s.trim().lines().last().unwrap_or("{}"))
@@ -533,9 +549,9 @@ fn card_loop(state: State, cfg: Arc<Config>) {
                 // Notify "authenticating" the moment a tap is detected (oracle auth takes seconds)
                 send_terminal(&state, r#"{"type":"detecting"}"#.to_string());
                 match attest_with_card(&mut card, &oracle) {
-                    Ok(idi) => {
+                    Ok((idi, att_json)) => {
                         last_idm = idm;
-                        on_card(&state, &cfg, &idi);
+                        on_card(&state, &cfg, &idi, att_json);
                     }
                     Err(e) => {
                         eprintln!("auth failed: {e:#}");
@@ -555,6 +571,7 @@ fn card_loop(state: State, cfg: Arc<Config>) {
                     {
                         let mut s = state.lock().unwrap();
                         s.current_idi = None;
+                        s.current_att = None;
                         s.last_card_json = None;
                     }
                     send_terminal(&state, r#"{"type":"cardRemoved"}"#.to_string());
@@ -566,7 +583,8 @@ fn card_loop(state: State, cfg: Arc<Config>) {
 }
 
 /// Runs challenge→Auth1→settle→Auth2→attest on a polled card to obtain the IDi
-fn attest_with_card(card: &mut Card, oracle: &Oracle) -> anyhow::Result<String> {
+/// and the attestation JSON needed for on-chain ZK verification
+fn attest_with_card(card: &mut Card, oracle: &Oracle) -> anyhow::Result<(String, String)> {
     let idm = card.idm;
     let mut r1: Block = [0u8; 8];
     rand::thread_rng().fill_bytes(&mut r1);
@@ -585,12 +603,42 @@ fn attest_with_card(card: &mut Card, oracle: &Oracle) -> anyhow::Result<String> 
         .ok_or_else(|| anyhow::anyhow!("bad c2b"))?;
     let auth2 = card.authentication2(&c2b, AUTH2_TIMEOUT)?;
     let attest = oracle.attest(&hex::encode(idm), &hex::encode(c1b), &hex::encode(c2a), &hex::encode(&auth2))?;
-    Ok(attest.idi.to_lowercase())
+    let att_json = attestation_json(&attest, &r1)?;
+    Ok((attest.idi.to_lowercase(), att_json))
+}
+
+/// Converts the oracle's coordinate-form Groth16 proof into the Arkworks
+/// compressed bytes accepted by `sui::groth16`, and builds the attestation JSON
+/// passed to sui-pay.mjs.
+///
+/// r1 is chosen by this process's CSPRNG and the proof is bound to it. The
+/// on-chain gate requires the same r1 and burns it, so this JSON can only be
+/// used once.
+fn attestation_json(att: &usb_poc::oracle::AttestResult, r1: &Block) -> anyhow::Result<String> {
+    let wire = prover::Groth16Proof {
+        alg: att.proof.alg.clone(),
+        a: att.proof.a.clone(),
+        b: att.proof.b.clone(),
+        c: att.proof.c.clone(),
+        public_inputs: att.proof.public_inputs.clone(),
+    };
+    let proof = prover::proof_compressed_bytes(&wire)
+        .map_err(|e| anyhow::anyhow!("failed to convert proof to compressed form: {e}"))?;
+    let pis = prover::public_inputs_bytes(&wire)
+        .map_err(|e| anyhow::anyhow!("failed to convert public inputs: {e}"))?;
+    Ok(serde_json::json!({
+        "idi": att.idi.to_lowercase(),
+        "attested_at": att.attested_at,
+        "r1": hex::encode(r1),
+        "proof": hex::encode(proof),
+        "public_inputs": hex::encode(pis),
+    })
+    .to_string())
 }
 
 /// On card confirmation: look up balance / registration and send a card event to the terminal
-fn on_card(state: &State, cfg: &Arc<Config>, idi: &str) {
-    eprintln!("card: IDi={idi}");
+fn on_card(state: &State, cfg: &Arc<Config>, idi: &str, att_json: String) {
+    eprintln!("card: IDi={idi} (ZK attestation obtained)");
     let bal = sui_helper(cfg, &["balance", idi]);
     let balance = bal.get("balance").and_then(|x| x.as_str()).unwrap_or("0").to_string();
     // On-chain registration is approximated by balance > 0 (charged via regist-web = registered)
@@ -599,6 +647,7 @@ fn on_card(state: &State, cfg: &Arc<Config>, idi: &str) {
     {
         let mut s = state.lock().unwrap();
         s.current_idi = Some(idi.to_string());
+        s.current_att = Some(att_json);
         s.last_card_json = Some(json.clone());
     }
     send_terminal(state, json);

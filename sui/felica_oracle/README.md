@@ -8,8 +8,11 @@ key is 360 bytes, both of which `sui::groth16` already accepts as-is.
 sources/felica_auth.move   the wire type; bytes → statement, envelope checks
 sources/zk_verifier.move   pinned verifying key, the pairing check
 sources/gate.move          the state a stateless check cannot have
+sources/suicash_gate.move  SuiCash's deployment: shared gate, Clock, receipt event
 tests/fixture.move         @generated — real vk + a real proof
 tests/zk_verifier_tests.move
+tests/suicash_gate_tests.move
+publish.sh                 publish + create the shared gate + write gate.json
 ```
 
 ## The statement
@@ -42,6 +45,28 @@ let idi = gate::verify_and_claim(&mut gate, &att, presented_r1, now_seconds());
 
 `verify_and_claim` returns the claimed IDi. It aborts rather than returning
 `false`, so a caller cannot forget to check.
+
+## The SuiCash deployment (`suicash_gate`)
+
+`gate` and `zk_verifier` are libraries; `suicash_gate` is the deployment: it
+pins the witness type (`SUICASH`), shares one `Gate<SUICASH>`, feeds the drift
+check from `sui::clock::Clock` instead of a payer-chosen number, and emits an
+`AttestationVerified` receipt event.
+
+Deploy with `./publish.sh` (publishes the package, creates the shared gate,
+writes `usb-poc/facepay/gate.json` for the payment helper). Per payment, the
+facepay daemon builds one PTB:
+
+```
+0: suicash_gate::verify(gate, idi, attested_at, proof, public_inputs, r1, Clock)
+1: SplitCoins(gas, amount)
+2: TransferObjects([coin], merchant)
+```
+
+PTB commands are atomic, so the transfer cannot execute unless the Groth16
+proof verified on chain and the `r1` burn succeeded in the same transaction.
+One attestation authorises exactly one payment; the next payment needs a new
+card tap.
 
 Order inside the gate is deliberate: drift and allowlist first (an
 unauthorised caller cannot use the call as a free pairing oracle), then the
