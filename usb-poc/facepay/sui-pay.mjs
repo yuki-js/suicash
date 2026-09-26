@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * 母艦の Sui 決済ヘルパー。
- * IDi から決定的にウォレットを導出(regist-web と同一方式)し、残高照会・送金を行う。
- * facepay デーモンからサブコマンドで呼ばれ、JSON を1行返す。
+ * Sui payment helper for the host.
+ * Deterministically derives a wallet from the IDi (same scheme as regist-web) and does balance inquiry / transfers.
+ * Invoked by the facepay daemon via subcommands; prints one line of JSON.
  *
  *   node sui-pay.mjs address <idiHex>
  *   node sui-pay.mjs balance <idiHex>
  *   node sui-pay.mjs pay     <idiHex> <amountMist> <merchantAddr>
  *
- * 環境変数 SUI_RPC: fullnode JSON-RPC(既定は publicnode の testnet)
+ * Env var SUI_RPC: fullnode JSON-RPC (defaults to publicnode testnet)
  *
- * ⚠ 導出方式は regist-web/src/lib/wallet.ts と厳密に一致させること:
- *   seed = SHA-256("suicash-aa-wallet:v1:" || idiBytes(8)) → Ed25519 秘密鍵
+ * ⚠ The derivation must exactly match regist-web/src/lib/wallet.ts:
+ *   seed = SHA-256("suicash-aa-wallet:v1:" || idiBytes(8)) → Ed25519 private key
  */
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { SuiClient } from "@mysten/sui/client";
@@ -74,20 +74,55 @@ async function main() {
       process.exit(2);
     }
     const before = await getBalanceMist(address);
-    const tx = new Transaction();
-    const [coin] = tx.splitCoins(tx.gas, [amount]);
-    tx.transferObjects([coin], merchant);
-    const res = await client.signAndExecuteTransaction({
-      signer: kp,
-      transaction: tx,
-      options: { showEffects: true },
-    });
-    const status = res.effects?.status?.status;
-    if (status !== "success") {
-      out({ ok: false, error: res.effects?.status?.error || status || "tx failed", address });
+    // Fix the gas budget so the tx is deterministic (avoids equivocation from
+    // estimate jitter contending for the same coin). Identical txs are idempotent on Sui.
+    const GAS_BUDGET = 20_000_000n; // 0.02 SUI
+    const buildTx = () => {
+      const tx = new Transaction();
+      tx.setGasBudget(GAS_BUDGET);
+      const [coin] = tx.splitCoins(tx.gas, [amount]);
+      tx.transferObjects([coin], merchant);
+      return tx;
+    };
+
+    // Retry transient object conflicts (lock/version mismatch) once
+    const isTransient = (m) =>
+      /lock|equivocat|version|not available|reserved|conflict|deadline|timeout|fetch failed|network|ECONN/i.test(
+        m || ""
+      );
+    let res;
+    let lastErr = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        res = await client.signAndExecuteTransaction({
+          signer: kp,
+          transaction: buildTx(),
+          options: { showEffects: true },
+        });
+        const status = res.effects?.status?.status;
+        if (status === "success") {
+          lastErr = "";
+          break;
+        }
+        lastErr = res.effects?.status?.error || status || "tx failed";
+        res = undefined;
+      } catch (e) {
+        lastErr = e?.message || String(e);
+      }
+      if (attempt === 0 && isTransient(lastErr)) {
+        await new Promise((r) => setTimeout(r, 1200));
+        continue;
+      }
+      break;
+    }
+    if (!res) {
+      out({ ok: false, error: lastErr || "tx failed", address });
       process.exit(1);
     }
-    await new Promise((r) => setTimeout(r, 1500));
+    // Wait for finality before reading coin state (so the next payment has no version conflict)
+    try {
+      await client.waitForTransaction({ digest: res.digest });
+    } catch {}
     let after;
     try {
       after = (await getBalanceMist(address)).toString();

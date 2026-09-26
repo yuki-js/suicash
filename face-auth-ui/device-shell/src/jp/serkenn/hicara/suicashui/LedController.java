@@ -5,13 +5,13 @@ import android.util.Log;
 import com.viaembedded.smartetk.GPIO;
 
 /**
- * Hi-CARA 上部 RGB LED(SmartETK GPIO)の制御。
- * ピン 1=緑 / 2=赤 / 3=青(frcardreader の LedClass と同じ割当)。
- * setEnable(pin,true) → setValue(pin, 1/0) で個別オン/オフ。混色可。
- * 点滅はアプリ側で 500ms トグル。
+ * Controls the Hi-CARA top RGB LED (SmartETK GPIO).
+ * Pins 1=green / 2=red / 3=blue (same mapping as frcardreader's LedClass).
+ * setEnable(pin,true) → setValue(pin, 1/0) turns each on/off. Colors can be mixed.
+ * Blinking is a 500ms toggle done in the app.
  *
- * ローカルデーモン 127.0.0.1:49582 へ TCP する GPIO サービスを使う。
- * サービスが無い/権限が無い環境でも落ちないよう、失敗は握りつぶす。
+ * Uses the GPIO service that talks TCP to the local daemon at 127.0.0.1:49582.
+ * Failures are swallowed so it won't crash when the service or permission is missing.
  */
 public final class LedController {
 
@@ -22,11 +22,11 @@ public final class LedController {
     private static final int[] PINS = { PIN_GREEN, PIN_RED, PIN_BLUE };
 
     public enum Mode {
-        OFF,          // 消灯
-        BLUE_BLINK,   // 認証中/顔認証(青点滅)
-        GREEN,        // 成功(緑点灯)
-        RED,          // 失敗/未登録(赤点灯)
-        BLUE,         // 待機の淡い在席表示に使う場合(青点灯)
+        OFF,          // off
+        BLUE_BLINK,   // authenticating / face auth (blue blink)
+        GREEN,        // success (solid green)
+        RED,          // failure / not registered (solid red)
+        BLUE,         // for a subtle idle presence indicator (solid blue)
     }
 
     private GPIO gpio;
@@ -46,11 +46,11 @@ public final class LedController {
             Log.i(TAG, "LED init OK");
         } catch (Throwable t) {
             ready = false;
-            Log.w(TAG, "LED init failed (LED無効で続行): " + t);
+            Log.w(TAG, "LED init failed (continuing with LED disabled): " + t);
         }
     }
 
-    /** r/g/b を 0/1 で即時設定(点滅は止める) */
+    /** Set r/g/b to 0/1 immediately (stops blinking) */
     private synchronized void solid(int r, int g, int b) {
         stopBlink();
         write(r, g, b);
@@ -75,7 +75,7 @@ public final class LedController {
         }
     }
 
-    /** 指定色を 500ms 周期で点滅 */
+    /** Blink the given color with a 500ms period */
     private synchronized void blink(final int r, final int g, final int b) {
         stopBlink();
         if (!ready) return;
@@ -95,7 +95,7 @@ public final class LedController {
         blinkThread.start();
     }
 
-    /** UI 状態に対応する LED を設定 */
+    /** Set the LED for the given UI state */
     public synchronized void set(Mode mode) {
         switch (mode) {
             case OFF:
@@ -116,7 +116,7 @@ public final class LedController {
         }
     }
 
-    /** 文字列(JS ブリッジから)→ Mode */
+    /** String (from the JS bridge) → Mode */
     public void setByName(String name) {
         Mode m;
         switch (name == null ? "" : name) {

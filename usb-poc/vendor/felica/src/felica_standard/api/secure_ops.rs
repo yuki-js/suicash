@@ -501,7 +501,7 @@ impl<'a, D: FelicaDriver + ?Sized> FelicaStandard<'a, D> {
                     context.nodes()
                 ))
             })?;
-            // "サービスコードリスト順番" is four bits wide (§4.4.5, figure 4-8).
+            // "Service Code List Order" is four bits wide (§4.4.5, figure 4-8).
             if index > 0x0F {
                 return Err(FelicaStandardError::InvalidParameter(format!(
                     "node {:#06X} is at position {index} of the authenticated node list, which a block list element cannot address",

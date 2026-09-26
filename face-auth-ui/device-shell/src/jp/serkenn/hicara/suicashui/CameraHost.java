@@ -25,14 +25,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * 前面カメラ(Camera2)のホスト。WebView の下に敷いた TextureView に
- * プレビューを流し、grabUpright() で現在フレームを正立 Bitmap として返す。
+ * Front camera (Camera2) host. Streams the preview to a TextureView placed under
+ * the WebView, and grabUpright() returns the current frame as an upright Bitmap.
  *
- * WebView(Chromium 74)の getUserMedia はこの端末のカメラ HAL と噛み合わず
- * フレームが流れないため、カメラはネイティブ側が所有する。
+ * WebView (Chromium 74) getUserMedia doesn't work with this device's camera HAL
+ * and delivers no frames, so the camera is owned natively.
  *
- * この端末は SENSOR_ORIENTATION を 0 と申告するが実センサーは横向き実装のため、
- * BASE_ROTATION=90 で正立させる(縦持ち固定運用)。
+ * This device reports SENSOR_ORIENTATION as 0 but the sensor is actually mounted sideways,
+ * so BASE_ROTATION=90 makes it upright (fixed portrait use).
  */
 public class CameraHost {
 
@@ -74,13 +74,13 @@ public class CameraHost {
         });
     }
 
-    /** カメラ起動(UI スレッドへ委譲)。TextureView 準備前なら準備後に開く */
+    /** Start the camera (delegated to the UI thread). If the TextureView isn't ready, open once it is */
     public void start() {
         wanted = true;
         main.post(this::openCamera);
     }
 
-    /** カメラ停止 */
+    /** Stop the camera */
     public void stop() {
         wanted = false;
         main.post(this::closeCamera);
@@ -91,9 +91,9 @@ public class CameraHost {
     }
 
     /**
-     * 現在フレームを正立 Bitmap で返す(ワーカースレッドから呼ぶこと)。
-     * getBitmap は UI スレッド限定なので latch で受け渡す。
-     * カメラ解像度そのままで取り、回転→必要なら縮小(顔検出は向き・比率に敏感)。
+     * Return the current frame as an upright Bitmap (call from a worker thread).
+     * getBitmap is UI-thread only, so hand it over via a latch.
+     * Grab at full camera resolution, rotate, then downscale if needed (face detection is sensitive to orientation and aspect).
      */
     public Bitmap grabUpright(int maxW) {
         final AtomicReference<Bitmap> ref = new AtomicReference<>();
@@ -133,7 +133,7 @@ public class CameraHost {
 
     // ------------------------------------------------------------ Camera2
 
-    @SuppressLint("MissingPermission") // CAMERA は MainActivity 側で確認済み
+    @SuppressLint("MissingPermission") // CAMERA already checked in MainActivity
     private void openCamera() {
         if (!wanted || camera != null || !view.isAvailable()) {
             return;
@@ -193,7 +193,7 @@ public class CameraHost {
         if (sizes == null || sizes.length == 0) {
             return null;
         }
-        // 4:3 で 1280 以下の最大を選ぶ(無ければ先頭)
+        // pick the largest 4:3 size up to 1280 (else the first)
         Size best = null;
         for (Size s : sizes) {
             if (s.getWidth() > 1280) {

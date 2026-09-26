@@ -88,8 +88,8 @@ fn parse_key(label: &str, rec: &JsonlRecord) -> Result<[u8; 8], String> {
     }
     // `version` is `"0000"` for the DES key set this oracle serves.
     //
-    // The hard rejection here was commented out in 17bd2c0 ("キーのバージョンチェックを
-    // コメントアウト") so records carrying another version string are accepted. Rejecting
+    // The hard rejection here was commented out in 17bd2c0 ("comment out the key
+    // version check") so records carrying another version string are accepted. Rejecting
     // is the safer default: a record written for a different key derivation
     // would otherwise be accepted silently and produce an oracle that cannot
     // authenticate anything. Since it is no longer enforced, the value is at

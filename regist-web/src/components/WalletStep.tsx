@@ -6,28 +6,28 @@ interface Props {
   onCreate: () => void;
 }
 
-/** IDi から AA ウォレットを導出(発行)するステップ */
+/** Step that derives (issues) the AA wallet from the IDi */
 export function WalletStep({ address, onCreate }: Props) {
   const [busy, setBusy] = useState(false);
 
   return (
     <section className="card">
-      <h2 className="card__title">2. ウォレットを発行</h2>
+      <h2 className="card__title">2. Issue wallet</h2>
       <p className="card__desc">
-        カード番号(IDi)から、お支払い用の Sui ウォレットを導出します。
-        同じカードからは必ず同じウォレットが導出されるため、チャージは
-        カード番号だけで届きます。
+        We derive a Sui wallet for payments from your card number (IDi).
+        The same card always yields the same wallet, so top-ups reach you
+        with just the card number.
       </p>
 
       {address ? (
         <div className="field">
-          <span className="field__label">ウォレットアドレス(IDi から導出)</span>
+          <span className="field__label">Wallet address (derived from IDi)</span>
           <p className="field__check field__check--ok info__mono" style={{ wordBreak: "break-all" }}>
             {address}
           </p>
         </div>
       ) : (
-        <p className="card__desc">アドレスを計算しています…</p>
+        <p className="card__desc">Computing address…</p>
       )}
 
       <button
@@ -38,12 +38,12 @@ export function WalletStep({ address, onCreate }: Props) {
           onCreate();
         }}
       >
-        {busy ? "発行中…" : "このウォレットを発行する"}
+        {busy ? "Issuing…" : "Issue this wallet"}
       </button>
 
       <p className="card__note">
-        ネットワーク: Sui testnet(デモ)。ウォレットはカード番号から決定的に
-        導出されるため、資金の保護は決済時の「顔認証(端末内)+ ZKP 証明」が担います。
+        Network: Sui testnet (demo). Since the wallet is derived deterministically
+        from the card number, funds are protected at payment time by on-terminal face authentication + a ZK proof.
       </p>
     </section>
   );

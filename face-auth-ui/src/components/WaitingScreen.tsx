@@ -1,16 +1,16 @@
 import { mistToSui } from "../terminal";
 
 interface Props {
-  /** null=待機(残高照会のみ)/ 決済待機なら引き落とし額(MIST) */
+  /** null = idle (balance inquiry only) / when awaiting payment, the debit amount (MIST) */
   payment: { amount: string } | null;
 }
 
-/** カード待ち受け画面。母艦 CLI の設定(残高照会 / 決済 N)を上部に示す */
+/** Card waiting screen. Shows the host CLI setting (balance inquiry / payment N) at the top */
 export function WaitingScreen({ payment }: Props) {
   return (
     <div className="waiting">
       <div className={`waiting__badge ${payment ? "waiting__badge--pay" : ""}`}>
-        {payment ? `決済待機 ・ ${mistToSui(payment.amount)} SUI` : "残高照会モード"}
+        {payment ? `Payment: ${mistToSui(payment.amount)} SUI` : "Balance inquiry"}
       </div>
 
       <div className="waiting__mark" aria-hidden="true">
@@ -26,9 +26,9 @@ export function WaitingScreen({ payment }: Props) {
         </svg>
       </div>
 
-      <h1 className="waiting__title">カードをタッチ</h1>
+      <h1 className="waiting__title">Tap your card</h1>
       <p className="waiting__sub">
-        Suica / PASMO をリーダーにかざしてください
+        Hold your Suica / PASMO over the reader
       </p>
     </div>
   );

@@ -5,16 +5,16 @@ import {
 } from "./sim";
 
 /**
- * 顔認証エンジンの抽象層。
+ * Abstraction layer for the face recognition engine.
  *
- * 端末上では WebView シェルが公開する JS ブリッジ(window.SafrNative)経由で
- * 実エンジン(SAFR eSDK)を呼び、ブリッジが無い環境(ブラウザ開発時)では
- * モックへ自動フォールバックする。
+ * On the device it calls the real engine (SAFR eSDK) via the JS bridge
+ * (window.SafrNative) exposed by the WebView shell; where there is no bridge
+ * (browser development) it automatically falls back to the mock.
  *
- * カメラはネイティブ側が所有する。probe / register / recognize は
- * ネイティブが自分で現在フレームを取るため、JS から画像は送らない。
- * プレビュー映像は window.__safrFrame(dataUrl) として push されてくる
- * (CameraView が受けて表示する)。
+ * The native side owns the camera. For probe / register / recognize the native
+ * side grabs the current frame itself, so JS never sends images.
+ * Preview frames are pushed as window.__safrFrame(dataUrl)
+ * (received and displayed by CameraView).
  */
 
 export type EngineKind = "safr" | "mock";
@@ -27,25 +27,25 @@ export interface EngineStatus {
 export interface FaceEngine {
   readonly kind: EngineKind;
   status(): Promise<EngineStatus>;
-  /** 検出のみ(プレビューの品質メーター用)。顔が無ければ null */
+  /** Detection only (for the preview quality meters). null if no face */
   probe(): Promise<DetectedFace | null>;
   register(): Promise<RecognizeResult>;
   recognize(threshold: number): Promise<RecognizeResult>;
   clearStore(): Promise<void>;
-  /** カメラ画面に入る/出るときに呼ぶ(ネイティブのプレビュー起動・停止) */
+  /** Call when entering/leaving the camera screen (starts/stops the native preview) */
   cameraStart(): Promise<void>;
   cameraStop(): Promise<void>;
 }
 
 declare global {
   interface Window {
-    /** WebView シェルが addJavascriptInterface で公開するブリッジ */
+    /** Bridge exposed by the WebView shell via addJavascriptInterface */
     SafrNative?: {
       request(id: string, method: string, payload: string): void;
     };
-    /** シェル側が evaluateJavascript で呼ぶ応答コールバック */
+    /** Response callback the shell invokes via evaluateJavascript */
     __safrResolve?: (id: string, json: string) => void;
-    /** シェル側が push するプレビューフレーム(dataURL) */
+    /** Preview frame (dataURL) pushed by the shell */
     __safrFrame?: (dataUrl: string) => void;
   }
 }
@@ -142,8 +142,8 @@ function num(v: unknown): number {
 }
 
 /**
- * モックのアダプタ。実エンジンの「直前の detectFaces のキャッシュに対して
- * learn/recognize が動く」挙動に合わせ、最後の probe 結果を使う。
+ * Mock adapter. Uses the last probe result, matching the real engine's behavior
+ * where learn/recognize operate on the cache from the preceding detectFaces.
  */
 class MockAdapter implements FaceEngine {
   readonly kind = "mock" as const;

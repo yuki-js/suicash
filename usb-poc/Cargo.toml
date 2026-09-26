@@ -22,7 +22,7 @@ hex = "0.4"
 anyhow = "1"
 rand = "0.8"
 
-# 決済端末デーモン(facepay)の端末連携用 WebSocket サーバ。
+# WebSocket server for terminal integration in the payment terminal daemon (facepay).
 tungstenite = "0.24"
 
 [lib]
@@ -33,8 +33,8 @@ path = "src/lib.rs"
 name = "usb-poc"
 path = "src/main.rs"
 
-# 決済端末の母艦デーモン: FeliCa 読取(card)+ オラクル認証(oracle)+
-# WebSocket 端末連携 + オンチェーン決済(sui-pay.mjs)+ オペレータ CLI。
+# Payment terminal host daemon: FeliCa reads (card) + oracle auth (oracle) +
+# WebSocket terminal integration + on-chain payments (sui-pay.mjs) + operator CLI.
 [[bin]]
 name = "facepay"
 path = "src/bin/facepay.rs"

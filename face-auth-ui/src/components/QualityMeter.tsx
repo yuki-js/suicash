@@ -1,12 +1,12 @@
 interface Props {
   label: string;
   value: number | null;
-  /** 合格ライン(0..1)。invert=true のときは「これ未満で合格」 */
+  /** Pass threshold (0..1). With invert=true, values below it pass */
   gate: number;
   invert?: boolean;
 }
 
-/** cpq / contrast / sharpness / mask の品質ゲートを 1 本のバーで表す */
+/** Shows one cpq / contrast / sharpness / mask quality gate as a single bar */
 export function QualityMeter({ label, value, gate, invert = false }: Props) {
   const has = value !== null;
   const v = has ? Math.min(1, Math.max(0, value)) : 0;

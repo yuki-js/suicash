@@ -9,7 +9,7 @@ interface Props {
   onReset: () => void;
 }
 
-/** 登録完了後のダッシュボード(残高・チャージ) */
+/** Dashboard after registration (balance, top-up) */
 export function Dashboard({ reg, address, onReset }: Props) {
   const [balance, setBalance] = useState<string | null>(null);
   const [charging, setCharging] = useState(false);
@@ -25,7 +25,7 @@ export function Dashboard({ reg, address, onReset }: Props) {
     refresh();
   }, [refresh]);
 
-  // クールダウンのカウントダウン
+  // Cooldown countdown
   useEffect(() => {
     if (cooldown <= 0) return;
     const t = window.setTimeout(() => setCooldown((c) => c - 1), 1000);
@@ -38,7 +38,7 @@ export function Dashboard({ reg, address, onReset }: Props) {
     const res = await requestCharge(address);
     setMessage(res.message);
     if (res.ok) {
-      // faucet の反映には少し時間がかかる
+      // Faucet funds take a moment to show up
       window.setTimeout(refresh, 3000);
     } else if (res.retryAfterSec) {
       setCooldown(res.retryAfterSec);
@@ -52,14 +52,14 @@ export function Dashboard({ reg, address, onReset }: Props) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
-      // クリップボード不可の環境では何もしない
+      // Do nothing where the clipboard is unavailable
     }
   };
 
   return (
     <div className="dashboard">
       <section className="card card--balance">
-        <span className="balance__label">残高(Sui testnet)</span>
+        <span className="balance__label">Balance (Sui testnet)</span>
         <div className="balance__value">
           {balance === null ? "--" : balance} <small>SUI</small>
         </div>
@@ -69,47 +69,47 @@ export function Dashboard({ reg, address, onReset }: Props) {
             disabled={charging || cooldown > 0}
             onClick={charge}
           >
-            {charging ? "チャージ中…" : cooldown > 0 ? `再試行まで ${cooldown}s` : "チャージする"}
+            {charging ? "Topping up…" : cooldown > 0 ? `Retry in ${cooldown}s` : "Top up"}
           </button>
           <button className="btn btn--ghost" onClick={refresh}>
-            残高を更新
+            Refresh
           </button>
         </div>
         {message && <p className="balance__message">{message}</p>}
       </section>
 
       <section className="card">
-        <h2 className="card__title">登録情報</h2>
+        <h2 className="card__title">Registration</h2>
         <dl className="info">
           <div className="info__row">
-            <dt>カード番号</dt>
+            <dt>Card No.</dt>
             <dd>{formatCardNumber(reg.cardNumber)}</dd>
           </div>
           <div className="info__row">
-            <dt>IDi(発行ID)</dt>
+            <dt>IDi (issuance ID)</dt>
             <dd className="info__mono">{maskIdi(reg.idi)}</dd>
           </div>
           <div className="info__row">
-            <dt>顔認証</dt>
-            <dd className="info__ok">利用登録済み(顔データ非収集)</dd>
+            <dt>Face ID</dt>
+            <dd className="info__ok">Enrolled (no face data collected)</dd>
           </div>
           <div className="info__row">
-            <dt>ウォレット</dt>
+            <dt>Wallet</dt>
             <dd className="info__mono">
               {address.slice(0, 10)}…{address.slice(-6)}
               <button className="info__copy" onClick={copyAddress}>
-                {copied ? "コピーしました" : "コピー"}
+                {copied ? "Copied" : "Copy"}
               </button>
             </dd>
           </div>
         </dl>
         <p className="card__note">
-          お支払いは、お店の認証端末に顔をかざしてご利用いただけます。
+          To pay, just show your face to the store's authentication terminal.
         </p>
       </section>
 
       <button className="btn btn--danger-ghost" onClick={onReset}>
-        登録をやり直す(この端末の登録情報を消去)
+        Start over (erase registration on this device)
       </button>
     </div>
   );

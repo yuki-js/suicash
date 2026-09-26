@@ -3,27 +3,27 @@ import type { DetectedFace } from "../sim";
 
 interface Props {
   face: DetectedFace | null;
-  /** 品質ゲートを通過しているか(ガイド枠の色に反映) */
+  /** Whether the quality gate is passing (reflected in the guide color) */
   gateOk: boolean;
   hint: string;
   /**
-   * true: ネイティブ側がカメラを所有し、window.__safrFrame で push される
-   * プレビューフレームを表示する(端末上の実エンジン構成)。
-   * false: ブラウザ開発時。getUserMedia の前面カメラを表示する。
+   * true: the native side owns the camera; show preview frames pushed via
+   * window.__safrFrame (real-engine setup on the device).
+   * false: browser development; show the front camera via getUserMedia.
    */
   nativePreview: boolean;
 }
 
 /**
- * カメラプレビュー。鏡像表示し、上に顔ガイド(楕円)と検出枠をオーバーレイする。
- * カメラが使えない環境ではシルエットのプレースホルダを出す。
+ * Camera preview. Mirrored, with the face guide (ellipse) and detection box overlaid.
+ * Shows a silhouette placeholder where no camera is available.
  */
 export function CameraView({ face, gateOk, hint, nativePreview }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const [cameraState, setCameraState] = useState<"loading" | "on" | "off">("loading");
 
-  // ネイティブ push プレビュー
+  // Native pushed preview
   useEffect(() => {
     if (!nativePreview) return;
     window.__safrFrame = (dataUrl: string) => {
@@ -37,7 +37,7 @@ export function CameraView({ face, gateOk, hint, nativePreview }: Props) {
     };
   }, [nativePreview]);
 
-  // ブラウザ開発時の getUserMedia プレビュー
+  // getUserMedia preview for browser development
   useEffect(() => {
     if (nativePreview) return;
     let stream: MediaStream | null = null;
@@ -81,11 +81,11 @@ export function CameraView({ face, gateOk, hint, nativePreview }: Props) {
             <ellipse cx="50" cy="46" rx="24" ry="30" />
             <path d="M14 125 C14 95 30 84 50 84 C70 84 86 95 86 125 Z" />
           </svg>
-          <p>カメラを利用できません(プレビューは省略)</p>
+          <p>Camera unavailable (preview skipped)</p>
         </div>
       ) : nativePreview ? (
-        // ネイティブ push フレームは Android が前面カメラに自動適用する
-        // 水平ミラーで既に鏡像なので、CSS では反転しない
+        // Native pushed frames are already mirrored by Android's automatic
+        // front-camera horizontal flip, so don't flip them in CSS
         <img ref={imgRef} className="camera__video" alt="" />
       ) : (
         <video
@@ -97,11 +97,11 @@ export function CameraView({ face, gateOk, hint, nativePreview }: Props) {
         />
       )}
 
-      {/* 顔ガイド楕円 */}
+      {/* Face guide ellipse */}
       <div className={`camera__guide ${gateOk ? "camera__guide--ok" : ""}`} />
 
-      {/* 検出枠。ネイティブは表示フレームそのものを検出しているので座標を
-          そのまま使う。getUserMedia パスは CSS で反転表示しているため X を反転 */}
+      {/* Detection box. Native detects on the displayed frame itself, so use the
+          coordinates as is. The getUserMedia path is flipped in CSS, so flip X */}
       {b && (
         <div
           className={`camera__box ${gateOk ? "camera__box--ok" : ""}`}

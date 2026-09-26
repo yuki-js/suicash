@@ -1,4 +1,4 @@
-# SuiCash 登録サイト — ビルドして nginx で配信(ポート 1919)
+# SuiCash registration site — build and serve with nginx (port 1919)
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./

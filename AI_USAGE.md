@@ -1,26 +1,27 @@
 # AI Usage
 
-ETHGlobal のガイダンスに沿った AI 利用の開示。
+Disclosure of AI usage, following ETHGlobal's guidance.
 
-## 利用ツール
+## Tools used
 
-- **Claude Code**(Anthropic) — 2026-09-26 時点で利用中
+- **Claude Code** (Anthropic) — in use as of 2026-09-26
 
-## 支援を受けた作業
+## Work assisted
 
-- `face-auth-ui/` — 顔認証端末 UI(React)の設計・実装・実機互換対応
-  (Chromium 74 向けトランスパイル/CSS フォールバック)
-- `face-auth-ui/device-shell/` — 端末用 WebView シェル APK の実装とビルドスクリプト
-- 実機(Hi-CARA)での動作確認手順(adb reverse / インストール / 検証)
+- `face-auth-ui/` — design, implementation, and device compatibility work for the
+  face-authentication terminal UI (React) (transpiling for Chromium 74 / CSS fallbacks)
+- `face-auth-ui/device-shell/` — implementation and build scripts for the terminal's WebView shell APK
+- On-device (Hi-CARA) verification procedure (adb reverse / install / testing)
 
-## 人間側の関与
+## Human involvement
 
-- プロダクト仕様・アーキテクチャ判断(運用モードの母艦 CLI 制御、エンジンの
-  オンデバイス実行方針、ZKP パイプラインの配置)はチームが決定
-- 実機での顔認証動作・カメラ挙動の検証はチームが実施
-- 生成コードはチームがレビューし、ビルド・実機テストで検証
+- Product specification and architecture decisions (host PC CLI control of operating modes,
+  on-device engine execution, placement of the ZKP pipeline) were made by the team
+- On-device face-authentication behavior and camera behavior were verified by the team
+- Generated code was reviewed by the team and validated through builds and device testing
 
-## 備考
+## Notes
 
-- 顔認証エンジン(SAFR eSDK)は端末組み込みの商用エンジンで、素材は
-  非再配布のためリポジトリに含めていない(各自がローカルに配置)
+- The face-authentication engine (SAFR eSDK) is a commercial engine embedded in the device;
+  its materials are not redistributable and are not included in the repository (each developer
+  places them locally)

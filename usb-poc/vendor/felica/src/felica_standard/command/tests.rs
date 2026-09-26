@@ -410,7 +410,7 @@ fn to_frame_rejects_a_packet_longer_than_the_len_byte_can_describe() {
     }
 }
 
-/// §4.4.6's worked examples of 最大同時書き込みブロック数 are exactly what the
+/// §4.4.6's worked examples of the maximum number of blocks written at once are exactly what the
 /// 255-byte packet limit allows, which is how a caller can tell whether a block
 /// list is too long without knowing the product:
 ///

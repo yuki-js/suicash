@@ -1,13 +1,13 @@
-/** 登録状態の永続化(この端末の localStorage のみ) */
+/** Registration state persistence (this device's localStorage only) */
 
 export interface Registration {
-  /** 券面番号(表示用。空白なし) */
+  /** Card number (for display; no spaces) */
   cardNumber: string;
-  /** 8 バイト IDi(16 hex 文字)。ウォレット導出とオンチェーン対応付けのキー */
+  /** 8-byte IDi (16 hex chars). Key for wallet derivation and on-chain mapping */
   idi: string;
-  /** IDi から AA ウォレットを導出(発行)済みか */
+  /** Whether the AA wallet has been derived (issued) from the IDi */
   walletCreated: boolean;
-  /** 顔認証の利用登録が完了しているか(顔データは一切収集しない) */
+  /** Whether face authentication enrollment is complete (no face data is ever collected) */
   faceEnrolled: boolean;
 }
 
@@ -29,7 +29,7 @@ export function saveRegistration(r: Registration): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(r));
   } catch {
-    // 保存不可でもセッション内は動作させる
+    // Keep working within the session even if saving fails
   }
 }
 

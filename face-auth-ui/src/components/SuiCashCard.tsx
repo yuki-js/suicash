@@ -1,9 +1,9 @@
 /**
- * SuiCash プリペイドカードの券面。交通系 IC カード風のオリジナルデザイン。
- * - 地はシルバー、下部の多角形の山はテーマカラー(アクア #4DA2FF 系)
- * - ワードマークは assets/logo/suicash-logo.svg と同じ組み方(REM 605、iC のみアウトライン)
- * - マスコットは assets/mascot/suicash-mascot.svg をインライン縮小配置
- *   (外部 SVG を <img> で読むと Web フォントが遮断されるため全てインラインで組む)
+ * SuiCash prepaid card face. Original design in the style of a transit IC card.
+ * - Silver background; the polygonal mountains at the bottom use the theme color (aqua, #4DA2FF family)
+ * - Wordmark set the same way as assets/logo/suicash-logo.svg (REM 605, only iC outlined)
+ * - Mascot is assets/mascot/suicash-mascot.svg inlined and scaled down
+ *   (loading external SVG via <img> blocks web fonts, so everything is inlined)
  */
 export function SuiCashCard({ className }: { className?: string }) {
   return (
@@ -11,7 +11,7 @@ export function SuiCashCard({ className }: { className?: string }) {
       viewBox="0 0 172 108"
       className={className}
       role="img"
-      aria-label="SuiCash カード"
+      aria-label="SuiCash card"
     >
       <defs>
         <linearGradient id="scCardBody" x1="0" y1="0" x2="0.4" y2="1">
@@ -31,7 +31,7 @@ export function SuiCashCard({ className }: { className?: string }) {
       <g clipPath="url(#scCardClip)">
         <rect x="0" y="0" width="172" height="108" fill="url(#scCardBody)" />
 
-        {/* 下部の多角形の山脈。テーマカラーのアクアで面を割る */}
+        {/* Polygonal mountain range at the bottom, faceted in the aqua theme color */}
         <g>
           <polygon
             points="0,70 30,52 60,66 94,46 126,62 172,42 172,108 0,108"
@@ -40,7 +40,7 @@ export function SuiCashCard({ className }: { className?: string }) {
           <polygon points="30,52 60,66 22,108 0,108 0,70" fill="#2f6fb8" />
           <polygon points="94,46 126,62 96,108 56,108" fill="#6cb4ff" />
           <polygon points="126,62 172,42 172,108 140,108" fill="#2f6fb8" />
-          {/* 山を横切る白い波 */}
+          {/* White wave across the mountains */}
           <path
             d="M-4,82 C30,72 62,92 98,78 C126,68 152,80 176,72"
             fill="none"
@@ -51,7 +51,7 @@ export function SuiCashCard({ className }: { className?: string }) {
           />
         </g>
 
-        {/* IC チップ */}
+        {/* IC chip */}
         <g>
           <rect x="14" y="38" width="21" height="16" rx="2.5" fill="url(#scChip)" />
           <path
@@ -62,7 +62,7 @@ export function SuiCashCard({ className }: { className?: string }) {
           />
         </g>
 
-        {/* ワードマーク: Su / iC(アウトライン) / ash */}
+        {/* Wordmark: Su / iC (outlined) / ash */}
         <text
           x="13"
           y="27"
@@ -82,7 +82,7 @@ export function SuiCashCard({ className }: { className?: string }) {
           <tspan fill="#0a1a2f">ash</tspan>
         </text>
 
-        {/* マスコット。山の上に立たせる */}
+        {/* Mascot standing on the mountains */}
         <g transform="translate(118 26) scale(0.082)">
           <g fill="none" strokeLinecap="round">
             <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" strokeWidth="78" />

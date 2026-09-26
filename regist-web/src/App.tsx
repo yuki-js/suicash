@@ -15,22 +15,22 @@ import { resolveAddress } from "./lib/wallet";
 type Step = "idi" | "wallet" | "face" | "done";
 
 const STEP_LABELS: [Step, string][] = [
-  ["idi", "カード番号"],
-  ["wallet", "ウォレット"],
-  ["face", "顔認証"],
-  ["done", "完了"],
+  ["idi", "Card No."],
+  ["wallet", "Wallet"],
+  ["face", "Face ID"],
+  ["done", "Done"],
 ];
 
 /**
- * SuiCash 登録サイト(利用者のスマホ向け)。
- * カード番号(IDi)の登録 → IDi から AA ウォレットを導出 → 顔認証の利用登録
- * (ダミー)→ チャージ。決済時の顔照合は店舗の認証端末内で行われる。
+ * SuiCash registration site (for users' smartphones).
+ * Register card number (IDi) -> derive AA wallet from IDi -> enroll in face
+ * authentication (dummy) -> top up. Face matching at payment happens inside the store terminal.
  */
 export default function App() {
   const [reg, setReg] = useState<Registration | null>(() => loadRegistration());
   const [address, setAddress] = useState<string | null>(null);
 
-  // ウォレットは IDi から決定的に導出する(ルータが IDi→アドレスを解決できる)。
+  // The wallet is derived deterministically from the IDi (so the router can resolve IDi -> address).
   useEffect(() => {
     if (!reg) {
       setAddress(null);
@@ -64,7 +64,7 @@ export default function App() {
     <div className="app">
       <header className="app__header">
         <Logo inverted />
-        <span className="app__headerTag">登録サイト</span>
+        <span className="app__headerTag">Registration</span>
       </header>
 
       {step !== "done" && (
@@ -120,7 +120,7 @@ export default function App() {
       </main>
 
       <footer className="app__footer">
-        SuiCash 登録サイト(デモ)— 顔データ・カード番号が外部へ送信されることはありません
+        SuiCash registration (demo) — face data and card numbers are never sent externally
       </footer>
     </div>
   );

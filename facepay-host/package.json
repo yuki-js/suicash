@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "母艦の Sui 決済ヘルパー(IDi 導出ウォレットの残高照会・送金)",
+  "description": "Sui payment helper for the host PC (balance query / transfer for IDi-derived wallets)",
   "dependencies": {
     "@mysten/sui": "^1.45.0"
   }

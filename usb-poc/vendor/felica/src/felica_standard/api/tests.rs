@@ -768,7 +768,7 @@ fn write_without_encryption_accepts_the_warning_with_ff_status_flag1() {
         .expect("FFh/71h reports a completed write with a warning");
 }
 
-/// §4.4.5 leaves 最大同時読み出しブロック数 to the product, but the *response* is
+/// §4.4.5 leaves the maximum number of blocks read at once to the product, but the *response* is
 /// what bounds a read: 16 bytes per block on a 13-byte header against the
 /// 255-byte packet limit of §2.2 allows 15 blocks at most. The command itself
 /// stays small, so this cannot be caught when the frame is built.

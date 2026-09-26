@@ -6,18 +6,18 @@ interface Props {
 
 type Phase = "intro" | "camera" | "scanning" | "fallback";
 
-/** カメラ(getUserMedia)が使えるか */
+/** Whether the camera (getUserMedia) is available */
 function cameraAvailable(): boolean {
   return !!(window.isSecureContext && navigator.mediaDevices?.getUserMedia);
 }
 
 /**
- * 顔認証の利用登録ステップ。
+ * Face authentication enrollment step.
  *
- * 実際に前面カメラを起動してライブプレビューと撮影演出を見せる。ただし
- * プライバシー方針により、撮ったフレームは保存も送信もしない(その場で破棄)。
- * 実際の顔照合は決済時に認証端末(Hi-CARA)の内部だけで行われる。
- * カメラが使えない環境ではダミー進捗にフォールバックする。
+ * Actually starts the front camera to show a live preview and a capture effect. Per our
+ * privacy policy, however, captured frames are neither stored nor sent (discarded on the spot).
+ * Real face matching happens only inside the auth terminal (Hi-CARA) at payment time.
+ * Falls back to dummy progress where the camera is unavailable.
  */
 export function FaceStep({ onDone }: Props) {
   const [phase, setPhase] = useState<Phase>("intro");
@@ -25,7 +25,7 @@ export function FaceStep({ onDone }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // カメラ起動/停止
+  // Start/stop camera
   useEffect(() => {
     if (phase !== "camera" && phase !== "scanning") return;
     let cancelled = false;
@@ -57,11 +57,11 @@ export function FaceStep({ onDone }: Props) {
     };
   }, [phase]);
 
-  // 撮影演出(スキャン)。完了したら顔フレームは破棄して次へ
+  // Capture effect (scan). When done, discard the face frames and move on
   useEffect(() => {
     if (phase !== "scanning") return;
     if (scanPct >= 100) {
-      // フレームは保存・送信しない(その場で破棄)。カメラを止めて完了。
+      // Frames are never stored or sent (discarded on the spot). Stop the camera and finish.
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
       const t = window.setTimeout(onDone, 500);
@@ -71,7 +71,7 @@ export function FaceStep({ onDone }: Props) {
     return () => window.clearTimeout(t);
   }, [phase, scanPct, onDone]);
 
-  // ダミー進捗(カメラ不可)
+  // Dummy progress (no camera)
   const [dummyPct, setDummyPct] = useState<number | null>(null);
   useEffect(() => {
     if (dummyPct === null) return;
@@ -85,7 +85,7 @@ export function FaceStep({ onDone }: Props) {
 
   return (
     <section className="card">
-      <h2 className="card__title">3. 顔認証の利用登録</h2>
+      <h2 className="card__title">3. Enroll in Face ID</h2>
 
       {phase === "intro" && (
         <>
@@ -96,14 +96,14 @@ export function FaceStep({ onDone }: Props) {
             </svg>
           </div>
           <p className="card__desc">
-            顔認証のご利用手続きを行います。お支払い時の顔照合は
-            <strong>お店の認証端末の中だけ</strong>で行われます。
+            Let's set up face authentication. Face matching at payment happens
+            <strong>only inside the store's authentication terminal</strong>.
           </p>
           <button
             className="btn btn--primary btn--big"
             onClick={() => setPhase(cameraAvailable() ? "camera" : "fallback")}
           >
-            顔の登録をはじめる
+            Start face enrollment
           </button>
         </>
       )}
@@ -117,7 +117,7 @@ export function FaceStep({ onDone }: Props) {
               <div className="faceCam__scanline" style={{ top: `${scanPct}%` }} />
             )}
             <div className="faceCam__hint">
-              {phase === "scanning" ? `登録しています… ${scanPct}%` : "顔をワクに合わせてください"}
+              {phase === "scanning" ? `Enrolling… ${scanPct}%` : "Fit your face in the frame"}
             </div>
           </div>
           {phase === "camera" && (
@@ -128,7 +128,7 @@ export function FaceStep({ onDone }: Props) {
                 setPhase("scanning");
               }}
             >
-              この顔で登録する
+              Enroll this face
             </button>
           )}
         </>
@@ -150,24 +150,24 @@ export function FaceStep({ onDone }: Props) {
           {dummyPct === null ? (
             <>
               <p className="card__desc">
-                カメラを利用できないため、簡易登録を行います。
+                The camera is unavailable, so we'll do a simplified enrollment.
               </p>
               <button className="btn btn--primary btn--big" onClick={() => setDummyPct(0)}>
-                利用登録をはじめる
+                Start enrollment
               </button>
             </>
           ) : (
             <p className="card__desc">
-              {dummyPct < 100 ? "登録手続きを実行しています…" : "登録手続きが完了しました"}
+              {dummyPct < 100 ? "Enrolling…" : "Enrollment complete"}
             </p>
           )}
         </>
       )}
 
       <p className="card__note">
-        【プライバシー】撮影した顔画像・顔データは保存も送信もしません(その場で破棄)。
-        実際の顔照合は決済時に認証端末の内部だけで行われ、そこでも顔データは
-        端末の外へ出ません。
+        [Privacy] Captured face images and face data are never stored or sent (discarded on the spot).
+        Real face matching happens only inside the auth terminal at payment time, and even there
+        face data never leaves the terminal.
       </p>
     </section>
   );

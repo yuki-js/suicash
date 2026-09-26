@@ -1,4 +1,4 @@
-/* SuiCash 登録サイト — スマホ縦持ち前提のモバイルレイアウト */
+/* SuiCash registration site — mobile layout assuming portrait phones */
 
 :root {
   --navy: #0a1a2f;
@@ -34,7 +34,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ===== 全体 ===== */
+/* ===== Global ===== */
 
 .app {
   max-width: 480px;
@@ -75,7 +75,7 @@ body {
   text-align: center;
 }
 
-/* ===== ワードマーク ===== */
+/* ===== Wordmark ===== */
 
 .logo {
   font-family: var(--font-brand);
@@ -101,7 +101,7 @@ body {
   -webkit-text-stroke: 1.3px var(--ink);
 }
 
-/* ===== ステッパー ===== */
+/* ===== Stepper ===== */
 
 .stepper {
   display: flex;
@@ -155,7 +155,7 @@ body {
   font-weight: 700;
 }
 
-/* ===== カード ===== */
+/* ===== Card ===== */
 
 .card {
   background: var(--navy-2);
@@ -193,7 +193,7 @@ body {
   padding-top: 10px;
 }
 
-/* ===== フォーム ===== */
+/* ===== Form ===== */
 
 .field {
   display: flex;
@@ -247,7 +247,7 @@ body {
   margin: 0;
 }
 
-/* ===== ボタン ===== */
+/* ===== Buttons ===== */
 
 .btn {
   font-family: inherit;
@@ -295,7 +295,7 @@ body {
   font-size: 13px;
 }
 
-/* ===== 券面スキャナ ===== */
+/* ===== Card scanner ===== */
 
 .scan {
   display: flex;
@@ -328,7 +328,7 @@ body {
   font-size: 13px;
 }
 
-/* カードガイド枠(幅 90%・カード比率・中央) — IdiStep の切り出し計算と一致させること */
+/* Card guide frame (90% width, card aspect, centered) — must match IdiStep's crop math */
 .scan__guide {
   position: absolute;
   left: 5%;
@@ -342,7 +342,7 @@ body {
   pointer-events: none;
 }
 
-/* ID 行ハイライト(ガイド枠に対する ID_ROI と一致させること) */
+/* ID line highlight (must match ID_ROI relative to the guide frame) */
 .scan__idbox {
   position: absolute;
   left: 42%;
@@ -374,7 +374,7 @@ body {
   gap: 8px;
 }
 
-/* ===== 顔登録(ダミー) ===== */
+/* ===== Face enrollment (dummy) ===== */
 
 .facePreview {
   align-self: center;
@@ -417,7 +417,7 @@ body {
   transition: width 0.1s linear;
 }
 
-/* ===== 顔登録カメラ ===== */
+/* ===== Face enrollment camera ===== */
 
 .faceCam {
   position: relative;
@@ -433,7 +433,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transform: scaleX(-1); /* 前面カメラは鏡像 */
+  transform: scaleX(-1); /* front camera is mirrored */
 }
 
 .faceCam__guide {
@@ -479,7 +479,7 @@ body {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
 }
 
-/* ===== ダッシュボード ===== */
+/* ===== Dashboard ===== */
 
 .dashboard {
   display: flex;

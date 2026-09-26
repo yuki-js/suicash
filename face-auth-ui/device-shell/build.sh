@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# SuiCash UI Shell APK のビルド。
-# Gradle 非依存の手順 (aapt2 link → javac → d8 → zipalign → apksigner)。
-# 署名は自動生成するデバッグ鍵。
+# Build the SuiCash UI Shell APK.
+# Gradle-free steps (aapt2 link → javac → d8 → zipalign → apksigner).
+# Signed with an auto-generated debug key.
 #
-# 必要なもの: JDK / Android SDK build-tools 35 以上 / android-29 以上の android.jar
+# Requirements: JDK / Android SDK build-tools 35+ / android.jar for android-29+
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -11,10 +11,10 @@ OUT_DIR=build
 DIST_DIR=dist
 KEY_DIR=keys
 
-# ---------------------------------------------------------------- SDK 解決
+# ---------------------------------------------------------------- SDK lookup
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 if [ -z "$SDK" ] || [ ! -d "$SDK" ]; then
-  echo "ERROR: ANDROID_HOME / ANDROID_SDK_ROOT が未設定か存在しない" >&2
+  echo "ERROR: ANDROID_HOME / ANDROID_SDK_ROOT is unset or does not exist" >&2
   exit 2
 fi
 
@@ -28,7 +28,7 @@ for p in $(ls -1 "$SDK/platforms" 2>/dev/null | sed 's/^android-//' | grep -E '^
   fi
 done
 if [ -z "$ANDROID_JAR" ]; then
-  echo "ERROR: API 29 以上の android.jar が見つからない" >&2
+  echo "ERROR: android.jar for API 29+ not found" >&2
   exit 2
 fi
 
@@ -36,23 +36,23 @@ echo "build-tools : $BT_VER"
 echo "android.jar : $ANDROID_JAR"
 echo "javac       : $(javac -version 2>&1)"
 
-# ------------------------------------------------------------- 同梱物の確認
-# 顔認証エンジン(SAFR eSDK)の素材は非再配布のため git に無い。
-# ビルドする本人がローカルに配置すること(.gitignore 参照)。
+# ---------------------------------------------------- check bundled assets
+# The face-recognition engine (SAFR eSDK) assets are not redistributable, so they are not in git.
+# Whoever builds must place them locally (see .gitignore).
 if [ ! -f assets/ESDKModels.zip ]; then
-  echo "ERROR: assets/ESDKModels.zip が無い(エンジンモデル。非再配布のためローカル配置)" >&2
+  echo "ERROR: assets/ESDKModels.zip missing (engine models; not redistributable, place locally)" >&2
   exit 2
 fi
 if [ ! -f libs/arm64-v8a/libESDK-lib.so ]; then
-  echo "ERROR: libs/arm64-v8a/*.so が無い(エンジンネイティブ。非再配布のためローカル配置)" >&2
+  echo "ERROR: libs/arm64-v8a/*.so missing (engine native libs; not redistributable, place locally)" >&2
   exit 2
 fi
 if [ ! -f src/jp/serkenn/hicara/suicashui/SafrLicense.java ]; then
-  echo "ERROR: SafrLicense.java が無い(エンジンライセンス。非再配布のためローカル配置)" >&2
+  echo "ERROR: SafrLicense.java missing (engine license; not redistributable, place locally)" >&2
   exit 2
 fi
 
-# ------------------------------------------------------------- 署名鍵の用意
+# ------------------------------------------------------- signing key setup
 mkdir -p "$KEY_DIR"
 if [ ! -f "$KEY_DIR/debug.keystore" ]; then
   keytool -genkeypair -keystore "$KEY_DIR/debug.keystore" \
@@ -61,7 +61,7 @@ if [ ! -f "$KEY_DIR/debug.keystore" ]; then
     -dname "CN=SuiCash Debug,O=SuiCash,C=JP"
 fi
 
-# ------------------------------------------------------------------ ビルド
+# ----------------------------------------------------------------- build
 rm -rf "$OUT_DIR" "$DIST_DIR"
 mkdir -p "$OUT_DIR/obj" "$OUT_DIR/dex" "$DIST_DIR"
 
@@ -82,7 +82,7 @@ javac -nowarn -source 8 -target 8 \
 "$BT/d8" --min-api 29 --lib "$ANDROID_JAR" --output "$OUT_DIR/dex" $(find "$OUT_DIR/obj" -name '*.class')
 (cd "$OUT_DIR/dex" && zip -q "$OLDPWD/$OUT_DIR/base.apk" classes.dex)
 
-# ネイティブライブラリ(extractNativeLibs=true なので圧縮のままでよい)
+# Native libraries (extractNativeLibs=true, so they can stay compressed)
 mkdir -p "$OUT_DIR/lib/arm64-v8a"
 cp libs/arm64-v8a/*.so "$OUT_DIR/lib/arm64-v8a/"
 (cd "$OUT_DIR" && zip -q -r base.apk lib)

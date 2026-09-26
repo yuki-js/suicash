@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="-21.6 -19.3 555.0 555.0" role="img" aria-label="SuiCash mascot">
   <title>SuiCash mascot</title>
 
-  <!-- 耳 = ペンギンのフリッパー。左右で長さ・角度・太さを変える -->
+  <!-- Ears = penguin flippers. Left and right differ in length, angle, and thickness -->
   <g fill="none" stroke-linecap="round">
     <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" stroke-width="78"/>
     <path d="M318 204 C340 164 366 130 396 112" stroke="#0A1A2F" stroke-width="62"/>
@@ -9,7 +9,7 @@
     <path d="M318 204 C340 164 366 130 396 112" stroke="#4DA2FF" stroke-width="48"/>
   </g>
 
-  <!-- 脚 4 本と、外側 2 本の水かき。輪郭は濃紺を先に敷いて重ねる -->
+  <!-- Four legs, with webbed feet on the outer two. Navy outline is laid down first, then overlaid -->
   <g fill="none" stroke-linecap="round">
     <path d="M148 330 C142 382 138 414 137 442" stroke="#0A1A2F" stroke-width="50"/>
     <path d="M222 330 C219 372 216 404 215 428" stroke="#0A1A2F" stroke-width="44"/>
@@ -27,14 +27,14 @@
   </g>
 
   <g stroke="#0A1A2F" stroke-width="10" stroke-linejoin="round">
-    <!-- 胴。左下に垂れた非対称の袋 -->
+    <!-- Body. An asymmetric sack sagging to the lower left -->
     <path fill="#4DA2FF" d="M272 124
                             C358 128 424 174 432 246
                             C438 304 402 348 342 366
                             C276 386 134 392 100 354
                             C66 316 78 256 108 214
                             C144 164 202 122 272 124 Z"/>
-    <!-- 顔の白い面。小さく、下寄り、少し左に寄せる -->
+    <!-- White face patch. Small, low, shifted slightly left -->
     <path fill="#FFFFFF" d="M236 250
                             C284 248 312 270 314 302
                             C316 334 294 356 252 360
@@ -42,7 +42,7 @@
                             C166 286 190 252 236 250 Z"/>
   </g>
 
-  <!-- 顔。極端に小さく、左右をわずかにずらす。口だけが顔幅より広く裂ける -->
+  <!-- Face. Extremely small, left/right slightly offset. Only the mouth splits wider than the face -->
   <g>
     <circle cx="215" cy="292" r="9.5" fill="#0A1A2F"/>
     <circle cx="263" cy="288" r="8" fill="#0A1A2F"/>

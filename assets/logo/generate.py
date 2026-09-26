@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
-"""SuiCash ロゴ生成スクリプト。
+"""SuiCash logo generator.
 
   python3 assets/logo/generate.py
 
-書き出すのは 2 ファイル。
+Writes two files.
 
-  suicash-logo.svg   ワードマーク
-  suicash-icon.svg   アプリ／ファビコン用アイコン（iC のみ）
+  suicash-logo.svg   wordmark
+  suicash-icon.svg   app / favicon icon (iC only)
 
-グリフのパスは書かない。Google Fonts の可変フォント REM を <text> で呼び出し、
-参照ロゴの字形に最も重なるウェイトを指定する。字間だけは、実測した比率どおりに
-1 文字ずつ絶対座標で置く。数値の出どころは README を参照。
+No glyph paths are written. The Google Fonts variable font REM is referenced from <text>
+at the weight that best overlaps the reference logo's letterforms. Only the spacing is
+fixed: each letter is placed at absolute coordinates following the measured ratios. See the
+README for where the numbers come from.
 
-FONT_SOURCE で Web フォントの参照方法を選べる。
+FONT_SOURCE selects how the web font is referenced.
 
-  "googlefonts" … Google Fonts から @import で読み込む（既定）
-  "selfhost"    … font/ に書き出したサブセット WOFF2 を相対パスで読み込む
+  "googlefonts" … loaded from Google Fonts via @import (default)
+  "selfhost"    … subset WOFF2 written to font/, loaded by relative path
 
-どちらの場合も、字送りの計算のためにローカルでフォントを解決する。
+Either way, the font is resolved locally to compute advances.
 """
 import os
 import tempfile
@@ -37,38 +38,38 @@ FONT_SOURCE = "googlefonts"            # "googlefonts" / "selfhost"
 GF_FAMILY = "REM"
 GF_CSS = ("https://fonts.googleapis.com/css2?family=REM:"
           "wght@100..900&display=block")
-FAMILY = "SuiCash Wordmark"            # selfhost のときのファミリー名
+FAMILY = "SuiCash Wordmark"            # family name when selfhosting
 
-# 4000px でラスタライズして画素単位で計測した。参照ロゴのパスは使っていない。
+# Measured per pixel from a 4000px rasterization. The reference logo's paths are not used.
 MEASURED = {
-    "x_height": 0.711,      # x-ハイト
-    "stem":     0.224,      # 小文字ステムの太さ
-    "outline":  0.062,      # 白抜き文字の輪郭線の太さ
-    "gap_flat": 0.444,      # 直線の側面どうしが隣り合うときのインク間のあき
-    "gap_step": 0.039,      # 側面が曲線のとき、1 辺につき詰める量
+    "x_height": 0.711,      # x-height
+    "stem":     0.224,      # lowercase stem thickness
+    "outline":  0.062,      # outline thickness of the reversed letters
+    "gap_flat": 0.444,      # ink gap between two adjacent straight sides
+    "gap_step": 0.039,      # tightening per curved side
 }
 
-# 参照ロゴの S / u / a のシルエットに最も重なるウェイト（73 書体から探索）。
+# Weight that best overlaps the reference logo's S / u / a silhouettes (searched across 73 typefaces).
 AXES = {"wght": 605.0}
 
-# 各文字の側面が曲線かどうか（左, 右）。字間の光学補正に使う。
+# Whether each letter's sides are curved (left, right). Used for optical spacing.
 ROUND_SIDES = {"S": (1, 1), "u": (0, 0), "i": (0, 0),
                "C": (1, 1), "a": (1, 0), "s": (1, 1), "h": (0, 0)}
 
-INK = "#0A1A2F"                        # 濃紺
-BLUE = "#4DA2FF"                       # Sui ブルー
+INK = "#0A1A2F"                        # navy
+BLUE = "#4DA2FF"                       # Sui blue
 WHITE = "#FFFFFF"
 
 WORD = "SuiCash"
-REVERSED = (2, 4)                      # "iC"（WORD[2:4]）を白抜きにする
-CAP_PX = 100.0                         # キャップハイトを 100px として組む
+REVERSED = (2, 4)                      # "iC" (WORD[2:4]) is reversed out
+CAP_PX = 100.0                         # set with a cap height of 100px
 
 
 # --------------------------------------------------------------------------
-# 1. フォントの取得 → インスタンス化 → サブセット
+# 1. Fetch the font → instantiate → subset
 # --------------------------------------------------------------------------
 def download_source():
-    """Google Fonts から latin サブセットの可変フォントを落としてキャッシュする。"""
+    """Download and cache the latin-subset variable font from Google Fonts."""
     os.makedirs(FONT_DIR, exist_ok=True)
     if os.path.exists(SRC_WOFF2):
         return
@@ -82,16 +83,16 @@ def download_source():
 
 
 def build_font(text):
-    """軸を固定して静的フォントにし、使う文字だけに絞った WOFF2 を書き出す。"""
+    """Pin the axes into a static font and write a WOFF2 subset to only the used characters."""
     download_source()
     font = TTFont(SRC_WOFF2)
-    # 指定しなかった軸も既定値で固定して、可変フォントではなくしてしまう
+    # Pin unspecified axes to their defaults too, so it is no longer a variable font
     location = {a.axisTag: AXES.get(a.axisTag, a.defaultValue)
                 for a in font["fvar"].axes}
     font = instancer.instantiateVariableFont(font, location, inplace=True)
 
     opts = Options()
-    opts.layout_features = []          # カーニングは使わない（座標で置くため）
+    opts.layout_features = []          # no kerning (letters are placed by coordinates)
     opts.name_IDs = [1, 2, 4, 6, 16]
     opts.notdef_outline = False
     sub = Subsetter(options=opts)
@@ -108,7 +109,7 @@ def build_font(text):
     return font
 
 
-FONT = build_font(WORD + "Hx")         # H, x は寸法の基準に使う
+FONT = build_font(WORD + "Hx")         # H and x are used as metric references
 CMAP = FONT.getBestCmap()
 GLYPHS = FONT.getGlyphSet()
 UPEM = FONT["head"].unitsPerEm
@@ -121,22 +122,22 @@ def bbox(ch):
 
 
 CAP = bbox("H")[3]
-SCALE = CAP_PX / CAP                   # フォント単位 → px
+SCALE = CAP_PX / CAP                   # font units → px
 FONT_SIZE = CAP_PX * UPEM / CAP
 OUTLINE_PX = MEASURED["outline"] * CAP_PX
 
 
 # --------------------------------------------------------------------------
-# 2. 字間 — 実測した比率どおりに 1 文字ずつ絶対座標で置く
+# 2. Spacing — place each letter at absolute coordinates following the measured ratios
 # --------------------------------------------------------------------------
 def gap_px(left_ch, right_ch):
-    """隣り合う 2 文字のインク間のあき。曲線の側面 1 辺につき gap_step 詰める。"""
+    """Ink gap between two adjacent letters, tightened by gap_step per curved side."""
     n = ROUND_SIDES[left_ch][1] + ROUND_SIDES[right_ch][0]
     return (MEASURED["gap_flat"] - MEASURED["gap_step"] * n) * CAP_PX
 
 
 def layout(word, rev_range=REVERSED):
-    """各文字の origin の x 座標（px）と、全体のインク幅を返す。"""
+    """Return each letter's origin x (px) and the total ink width."""
     origins, right = [], 0.0
     for i, ch in enumerate(word):
         x0, _, x1, _ = bbox(ch)
@@ -148,17 +149,17 @@ def layout(word, rev_range=REVERSED):
 
 
 def extents(word):
-    """ベースラインを 0 としたときの、上端と下端（px）。"""
+    """Top and bottom extents (px) relative to a baseline at 0."""
     top = max(bbox(c)[3] for c in word) * SCALE + OUTLINE_PX / 2
     bot = min(bbox(c)[1] for c in word) * SCALE - OUTLINE_PX / 2
     return top, bot
 
 
 # --------------------------------------------------------------------------
-# 3. SVG の組み立て
+# 3. SVG assembly
 # --------------------------------------------------------------------------
 def stylesheet():
-    """SVG に入れる <style> の中身。Web フォントは URL で参照する。"""
+    """Contents of the SVG <style>. The web font is referenced by URL."""
     if FONT_SOURCE == "googlefonts":
         return f"@import url('{GF_CSS}');"
     rel = os.path.relpath(OUT_WOFF2, HERE).replace(os.sep, "/")
@@ -167,12 +168,12 @@ def stylesheet():
 
 
 def font_attrs():
-    """<text> に載せるフォント指定。
+    """Font attributes for <text>.
 
-    font-variation-settings は可変フォントを解釈するブラウザでしか効かない。
-    画像ビューアや SVG エディタは既定ウェイト（多くは 400）で描いてしまうので、
-    font-weight も併記して、そういう環境でも近い太さになるようにする。
-    ブラウザでは font-variation-settings が優先されるので指定どおりになる。
+    font-variation-settings only works in browsers that handle variable fonts.
+    Image viewers and SVG editors render at the default weight (usually 400), so
+    font-weight is set as well to get a similar weight there.
+    Browsers give font-variation-settings priority, so they render as specified.
     """
     if FONT_SOURCE == "selfhost":
         return (f'font-family="{FAMILY}" font-size="{FONT_SIZE:.3f}" '
@@ -186,7 +187,7 @@ def font_attrs():
 
 
 def text_element(word, ink, fill, rev_range=REVERSED):
-    """白抜きの範囲だけ fill / stroke を入れ替えた <text> を返す。"""
+    """Return a <text> with fill / stroke swapped for the reversed range only."""
     origins, _ = layout(word, rev_range)
     fmt = lambda xs: " ".join(f"{x:.3f}" for x in xs)
     spans = []
@@ -203,7 +204,7 @@ def text_element(word, ink, fill, rev_range=REVERSED):
 
 
 def write_wordmark(path, pad=(40, 30, 34)):
-    """ワードマーク。透過背景、文字は濃紺、iC は白フィル＋濃紺の輪郭線。"""
+    """Wordmark. Transparent background, navy letters, iC in white fill + navy outline."""
     _, ink_w = layout(WORD)
     top, bot = extents(WORD)
     padx, padt, padb = pad
@@ -221,9 +222,9 @@ def write_wordmark(path, pad=(40, 30, 34)):
 
 
 def write_icon(path, size=512, radius=112, margin=74, mark="iC"):
-    """アイコン。Sui ブルーの角丸スクエアに、白抜きの iC を中央に置く。
+    """Icon. A reversed iC centered on a Sui-blue rounded square.
 
-    ワードマークと同じ書体・同じ字間規則なので、並べても字形が揃う。
+    Same typeface and spacing rules as the wordmark, so the letterforms match side by side.
     """
     rev = (0, len(mark))
     _, ink_w = layout(mark, rev)

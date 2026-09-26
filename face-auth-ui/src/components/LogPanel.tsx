@@ -5,7 +5,7 @@ export interface LogEntry {
   text: string;
 }
 
-/** エンジンイベントのデバッグログ。折りたたみ式(?debug=1 のときのみ表示) */
+/** Debug log of engine events. Collapsible (shown only with ?debug=1) */
 export function LogPanel({ entries, open, onToggle }: {
   entries: LogEntry[];
   open: boolean;
@@ -22,13 +22,13 @@ export function LogPanel({ entries, open, onToggle }: {
   return (
     <section className={`log ${open ? "log--open" : ""}`}>
       <button className="log__toggle" onClick={onToggle}>
-        <span>デバッグログ (engine)</span>
+        <span>Debug log (engine)</span>
         <span className="log__chevron">{open ? "▾" : "▸"}</span>
       </button>
       {open && (
         <div className="log__body" ref={bodyRef}>
           {entries.length === 0 ? (
-            <p className="log__empty">まだログはありません</p>
+            <p className="log__empty">No logs yet</p>
           ) : (
             entries.map((e, i) => (
               <p key={i} className="log__line">

@@ -1,15 +1,15 @@
-// SuiCash アセットの SVG → PNG 書き出しスクリプト。
+// Exports SuiCash asset SVGs to PNG.
 //
 //   npm --prefix assets install
 //   npm --prefix assets run generate-png [-- --scale=2]
 //
-// assets/ 以下の *.svg と同名の *.png を書き出す（SVG が正本、PNG は生成物で
-// git 管理しない）。resvg（Rust 製、ネイティブ依存なし）でラスタライズする。
+// Writes a *.png next to each *.svg under assets/ (SVGs are the source of truth; PNGs are
+// generated and not tracked in git). Rasterized with resvg (Rust, no native deps).
 //
-// ロゴ SVG の <text> は REM の可変フォント（wght 605）で組んであるため、
-// Google Fonts リポジトリから REM[wght].ttf を取得して resvg に渡す。
-// 初回のみネットワークが必要で、TMPDIR にキャッシュする（generate.py と同じ方針）。
-// 手元のフォントを使いたい場合は SUICASH_REM_TTF でパスを指定する。
+// The logo SVG's <text> is set in the REM variable font (wght 605), so REM[wght].ttf is
+// fetched from the Google Fonts repository and passed to resvg.
+// Network is needed only on the first run; the font is cached in TMPDIR (same as generate.py).
+// To use a local font instead, set its path in SUICASH_REM_TTF.
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";

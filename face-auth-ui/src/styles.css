@@ -1,12 +1,12 @@
-/* SuiCash 顔認証 UI — Hi-CARA 縦持ち端末を想定した携帯レイアウト
+/* SuiCash face auth UI — handheld layout for the portrait Hi-CARA terminal
  *
- * 互換性の注意: 実機 (Android 10) の AOSP WebView は Chromium 74。
- * そのため以下を使わない:
- *   - flexbox の gap (84+) → 隣接セレクタの margin で代替
- *   - aspect-ratio (88+)   → padding-bottom % で代替
- *   - inset (87+)          → top/right/bottom/left を明示
- *   - max() / dvh          → 静的フォールバックを先に書く
- * grid の gap は Chromium 66+ なので使ってよい。
+ * Compatibility note: the AOSP WebView on the real device (Android 10) is Chromium 74.
+ * So the following are not used:
+ *   - flexbox gap (84+)    → use margins on adjacent selectors
+ *   - aspect-ratio (88+)   → use padding-bottom %
+ *   - inset (87+)          → spell out top/right/bottom/left
+ *   - max() / dvh          → write a static fallback first
+ * grid gap is Chromium 66+, so it is fine to use.
  */
 
 :root {
@@ -43,7 +43,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ===== 全体レイアウト ===== */
+/* ===== Overall layout ===== */
 
 .app {
   max-width: 460px;
@@ -89,7 +89,7 @@ body {
   color: var(--warn);
 }
 
-/* 登録モード中であることを常時示すバナー(切替は母艦 CLI のみ) */
+/* Banner always shown in registration mode (toggled only from the host CLI) */
 
 .modeBanner {
   background: rgba(255, 191, 71, 0.12);
@@ -115,7 +115,7 @@ body {
   text-align: center;
 }
 
-/* ===== ワードマーク ===== */
+/* ===== Wordmark ===== */
 
 .logo {
   font-family: var(--font-brand);
@@ -141,7 +141,7 @@ body {
   -webkit-text-stroke: 1.4px var(--ink);
 }
 
-/* ===== ホーム ===== */
+/* ===== Home ===== */
 
 .home {
   flex: 1;
@@ -203,7 +203,7 @@ body {
   padding-top: 14px;
 }
 
-/* 登録モードのステータス行(表示のみ。操作は母艦 CLI から) */
+/* Registration mode status row (display only; controlled from the host CLI) */
 
 .enrollStatus {
   display: flex;
@@ -228,7 +228,7 @@ body {
   fill: var(--warn);
 }
 
-/* ===== ボタン ===== */
+/* ===== Buttons ===== */
 
 .btn {
   font-family: inherit;
@@ -297,7 +297,7 @@ body {
   background: #4ddba4;
 }
 
-/* ===== カメラ画面 ===== */
+/* ===== Camera screen ===== */
 
 .capture {
   flex: 1;
@@ -309,7 +309,7 @@ body {
   margin-top: 14px;
 }
 
-/* aspect-ratio の代わりに padding-bottom で 3:4 を確保(子は絶対配置) */
+/* 3:4 via padding-bottom instead of aspect-ratio (children absolutely positioned) */
 .camera {
   position: relative;
   border-radius: var(--radius);
@@ -331,7 +331,7 @@ body {
   object-fit: cover;
 }
 
-/* getUserMedia の生映像は非鏡像なので CSS で鏡像化する(ブラウザ開発時のみ) */
+/* Raw getUserMedia video is not mirrored, so mirror it in CSS (browser development only) */
 .camera__video--mirror {
   transform: scaleX(-1);
 }
@@ -415,7 +415,7 @@ body {
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 }
 
-/* 品質メーター(grid の gap は Chromium 66+ なので使える) */
+/* Quality meters (grid gap is Chromium 66+, so it can be used) */
 
 .capture__meters {
   display: grid;
@@ -490,7 +490,7 @@ body {
   flex: 1;
 }
 
-/* ===== 処理中 ===== */
+/* ===== Processing ===== */
 
 .processing {
   flex: 1;
@@ -520,7 +520,7 @@ body {
   }
 }
 
-/* ===== 結果 ===== */
+/* ===== Result ===== */
 
 .result {
   flex: 1;
@@ -647,7 +647,7 @@ body {
   margin-left: 10px;
 }
 
-/* ===== アンロック完了 ===== */
+/* ===== Unlock complete ===== */
 
 .unlocked {
   flex: 1;
@@ -739,7 +739,7 @@ body {
   color: var(--aqua);
 }
 
-/* ===== デバッグログ ===== */
+/* ===== Debug log ===== */
 
 .log {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -788,7 +788,7 @@ body {
   font-style: italic;
 }
 
-/* ===== 決済端末: 待機画面 ===== */
+/* ===== Payment terminal: waiting screen ===== */
 
 .waiting {
   flex: 1;
@@ -856,7 +856,7 @@ body {
   margin: 0;
 }
 
-/* ===== 顔キャプチャの見出し ===== */
+/* ===== Face capture header ===== */
 
 .capture__head {
   text-align: center;
@@ -868,7 +868,7 @@ body {
   color: var(--ink-dim);
 }
 
-/* ===== 残高照会 ===== */
+/* ===== Balance inquiry ===== */
 
 .balanceView {
   flex: 1;
@@ -932,7 +932,7 @@ body {
   color: var(--ink-dim);
 }
 
-/* ===== 未登録案内 ===== */
+/* ===== Unregistered card guidance ===== */
 
 .registerPrompt {
   flex: 1;
@@ -980,7 +980,7 @@ body {
   padding: 8px 16px;
 }
 
-/* ===== 改札 LCD 風 決済結果 ===== */
+/* ===== Ticket-gate LCD style payment result ===== */
 
 .lcd {
   flex: 1;
@@ -995,7 +995,7 @@ body {
 .lcd__panel {
   width: 100%;
   max-width: 380px;
-  background: #0b3d12; /* 改札の緑地 LCD */
+  background: #0b3d12; /* green ticket-gate LCD */
   color: #eafff0;
   border-radius: 10px;
   border: 3px solid #06260b;
@@ -1083,7 +1083,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== デバッグパネル(母艦シミュレータ) ===== */
+/* ===== Debug panel (host simulator) ===== */
 
 .debugPanel {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -1115,7 +1115,7 @@ body {
   cursor: pointer;
 }
 
-/* 幅の広い画面では端末風に浮かせる */
+/* On wide screens, float it like a device */
 
 @media (min-width: 520px) {
   body {

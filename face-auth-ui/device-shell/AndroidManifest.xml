@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  SuiCash UI Shell — Hi-CARA 実機に face-auth-ui (React) を表示するための最小 WebView シェル。
+  SuiCash UI Shell — minimal WebView shell that shows face-auth-ui (React) on a real Hi-CARA device.
 
-  端末にはブラウザが無いため、adb reverse で PC の dev サーバ (localhost:5173) を
-  端末側 localhost に見せ、それを WebView で全画面表示する。
+  The device has no browser, so adb reverse exposes the PC's dev server (localhost:5173)
+  as the device's localhost, and the WebView shows it full screen.
 
-  URL は intent の data で差し替えられる:
+  The URL can be overridden via the intent data:
     adb shell am start -n jp.serkenn.hicara.suicashui/.MainActivity \
       -d "http://localhost:5173/?mode=enroll"
-  singleTask + onNewIntent なので、起動中でも同コマンドで画面を切り替えられる
-  (母艦 CLI からのモード切替の第一実装)。
+  With singleTask + onNewIntent, the same command switches screens even while running
+  (first implementation of mode switching from the host CLI).
 
-  http (cleartext) は localhost 相手なので usesCleartextTraffic=true で許可。
-  getUserMedia は http://localhost が secure context 扱いのため動く。
+  http (cleartext) only talks to localhost, so it is allowed via usesCleartextTraffic=true.
+  getUserMedia works because http://localhost counts as a secure context.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="jp.serkenn.hicara.suicashui"

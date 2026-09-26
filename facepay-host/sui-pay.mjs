@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 /**
- * 母艦の Sui 決済ヘルパー。
- * IDi から決定的にウォレットを導出(regist-web と同一の方式)し、
- * 残高照会・送金を行う。Rust デーモンからサブコマンドで呼ばれ、JSON を返す。
+ * Sui payment helper for the host PC.
+ * Deterministically derives a wallet from the IDi (same scheme as regist-web)
+ * and queries balance / sends payments. Invoked by the Rust daemon via subcommands; prints JSON.
  *
- * 使い方:
+ * Usage:
  *   node sui-pay.mjs address <idiHex>
  *   node sui-pay.mjs balance <idiHex>
  *   node sui-pay.mjs pay     <idiHex> <amountMist> <merchantAddr>
  *
- * 環境変数:
- *   SUI_RPC      : fullnode JSON-RPC(既定は publicnode の testnet)
+ * Environment:
+ *   SUI_RPC      : fullnode JSON-RPC (default: publicnode testnet)
  *
- * ⚠ 導出方式は regist-web/src/lib/wallet.ts と厳密に一致させること。
- *   seed = SHA-256("suicash-aa-wallet:v1:" || idiBytes(8)) → Ed25519 秘密鍵
+ * ⚠ The derivation must exactly match regist-web/src/lib/wallet.ts.
+ *   seed = SHA-256("suicash-aa-wallet:v1:" || idiBytes(8)) → Ed25519 secret key
  */
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { SuiClient } from "@mysten/sui/client";
@@ -92,7 +92,7 @@ async function main() {
       out({ ok: false, error: res.effects?.status?.error || status || "tx failed", address });
       process.exit(1);
     }
-    // 反映まで少し待って残高を取り直す
+    // Wait briefly for the change to land, then re-fetch the balance
     await new Promise((r) => setTimeout(r, 1500));
     let after;
     try {

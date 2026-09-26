@@ -2,7 +2,7 @@
 name = "facepay-admin"
 version = "0.1.0"
 edition = "2021"
-description = "SuiCash 母艦 管理GUI: 決済端末 facepay デーモンをGUIから操作する独立アプリ"
+description = "SuiCash host PC admin GUI: standalone app for operating the facepay payment terminal daemon"
 
 [[bin]]
 name = "facepay-admin"

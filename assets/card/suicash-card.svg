@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="172" height="108" viewBox="0 0 172 108" role="img" aria-label="SuiCash カード">
-  <title>SuiCash カード</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="172" height="108" viewBox="0 0 172 108" role="img" aria-label="SuiCash card">
+  <title>SuiCash card</title>
   <style><![CDATA[@import url('https://fonts.googleapis.com/css2?family=REM:wght@100..900&display=block');]]></style>
   <defs>
     <linearGradient id="scGreen" x1="0" y1="0" x2="0" y2="1">
@@ -16,22 +16,22 @@
   </defs>
 
   <g clip-path="url(#scCardClip)">
-    <!-- 緑地(交通系カード風) -->
+    <!-- Green background (transit-card style) -->
     <rect x="0" y="0" width="172" height="108" fill="url(#scGreen)" />
 
-    <!-- 左の台形パネル(SuiCash テーマカラーのアクア) -->
+    <!-- Left trapezoid panel (SuiCash theme aqua) -->
     <polygon points="0,0 98,0 66,108 0,108" fill="url(#scAqua)" />
 
-    <!-- 右上の IC マーク(汎用・非ブランド) -->
+    <!-- Top-right IC mark (generic, unbranded) -->
     <g opacity="0.9">
       <rect x="146" y="9" width="17" height="11" rx="2.2" fill="none" stroke="#ffffff" stroke-width="1.1" />
       <text x="154.5" y="17.6" text-anchor="middle" font-family="REM, sans-serif" font-weight="700" font-size="7.2" fill="#ffffff">IC</text>
     </g>
 
-    <!-- マスコットの背後に白い当て板(緑と同化させないため) -->
+    <!-- White backing plate behind the mascot (so it doesn't blend into the green) -->
     <ellipse cx="136" cy="74" rx="31" ry="33" fill="#ffffff" opacity="0.92" />
 
-    <!-- マスコット(SuiCash オリジナル)。右下にペンギン位置で配置 -->
+    <!-- Mascot (SuiCash original), placed bottom right where the penguin would be -->
     <g transform="translate(103.4 37.5) scale(0.131)">
       <g fill="none" stroke-linecap="round">
         <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" stroke-width="78" />
@@ -68,7 +68,7 @@
       </g>
     </g>
 
-    <!-- ワードマーク: 左下に白で大きく(iC は濃紺アクセント) -->
+    <!-- Wordmark: large, white, bottom left (iC in navy accent) -->
     <text x="11" y="95" font-family="REM, sans-serif" font-weight="605" font-size="27" font-kerning="none" style="font-variation-settings:'wght' 605;font-variant-ligatures:none"><tspan fill="#ffffff" stroke="#0a1a2f" stroke-width="0.7" stroke-linejoin="miter">Su</tspan><tspan fill="#0a1a2f" stroke="#ffffff" stroke-width="1.1" stroke-linejoin="miter">iC</tspan><tspan fill="#ffffff" stroke="#0a1a2f" stroke-width="0.7" stroke-linejoin="miter">ash</tspan></text>
   </g>
 

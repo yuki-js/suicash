@@ -1,29 +1,29 @@
 /**
- * 決済端末の母艦↔端末プロトコル。
+ * Host ↔ terminal protocol for the payment terminal.
  *
- * FeliCa は母艦 PC が読み、オラクルで IDi を認証し、オンチェーン決済も母艦が行う。
- * 端末(この WebView)は UI 専任で、母艦とはイベント/レポートをやり取りする。
+ * The host PC reads FeliCa, authenticates the IDi via the oracle, and performs on-chain payment.
+ * The terminal (this WebView) is UI-only and exchanges events/reports with the host.
  *
- * ブリッジ(SAFR と同じ流儀):
- *  - 母艦 → 端末: WebView シェルが window.__facepayEvent(json) を呼ぶ
- *  - 端末 → 母艦: window.FacePayNative.report(json) を呼ぶ
- *  - 開発時(ブラウザ): postMessage({source:"suicash-facepay", ...}) で注入でき、
- *    レポートは console と postMessage に出す。?ws=<url> で WebSocket も使える。
+ * Bridge (same style as SAFR):
+ *  - host → terminal: the WebView shell calls window.__facepayEvent(json)
+ *  - terminal → host: call window.FacePayNative.report(json)
+ *  - development (browser): events can be injected via postMessage({source:"suicash-facepay", ...});
+ *    reports go to the console and postMessage. ?ws=<url> enables WebSocket too.
  */
 
 export const SOURCE = "suicash-facepay";
 
-/** 母艦 → 端末 のイベント */
+/** Host → terminal events */
 export type TerminalEvent =
-  /** カードを検出した瞬間の即時通知(オラクル認証はこの後・数秒)。UI 反応用 */
+  /** Immediate notice on card detection (oracle auth follows, a few seconds). For UI feedback */
   | { type: "detecting" }
-  /** カードがタッチされ、オラクルで IDi 認証済み */
+  /** Card tapped and IDi authenticated by the oracle */
   | { type: "card"; idi: string; registered: boolean; balance: string }
-  /** カードが離された/セッション終了 → 待機へ */
+  /** Card removed / session ended → back to idle */
   | { type: "cardRemoved" }
-  /** 端末モード: null=待機(残高照会のみ) / 決済待機(引き落とし額 amount[MIST 文字列]) */
+  /** Terminal mode: null = idle (balance inquiry only) / awaiting payment (debit amount[MIST string]) */
   | { type: "mode"; payment: { amount: string } | null }
-  /** 決済結果(母艦が送金を実行したあと) */
+  /** Payment result (after the host executes the transfer) */
   | {
       type: "paymentResult";
       ok: boolean;
@@ -33,29 +33,29 @@ export type TerminalEvent =
       error?: string;
     };
 
-/** 端末 → 母艦 のレポート */
+/** Terminal → host reports */
 export type TerminalReport =
-  /** 顔認証 or 顔登録が成功。母艦は決済待機なら送金へ進む */
+  /** Face auth or enrollment succeeded. If awaiting payment, the host proceeds to transfer */
   | { type: "faceOk"; idi: string }
-  /** 顔認証に失敗 */
+  /** Face auth failed */
   | { type: "faceNg"; idi: string }
-  /** その IDi の顔を端末にはじめて登録した */
+  /** Face for this IDi enrolled on the terminal for the first time */
   | { type: "enrolled"; idi: string }
-  /** 利用者がキャンセル/離脱 */
+  /** User cancelled / left */
   | { type: "cancel"; idi?: string };
 
 declare global {
   interface Window {
-    /** シェルが母艦イベントを流し込む入口 */
+    /** Entry point where the shell injects host events */
     __facepayEvent?: (json: string) => void;
-    /** シェルが公開する母艦へのレポート口 */
+    /** Report channel to the host exposed by the shell */
     FacePayNative?: { report(json: string): void };
-    /** シェルが公開する上部 RGB LED 制御 */
+    /** Top RGB LED control exposed by the shell */
     LedNative?: { set(mode: string): void };
   }
 }
 
-/** 上部 LED を設定(シェルが無い開発環境では no-op) */
+/** Set the top LED (no-op in development without the shell) */
 export type LedMode = "off" | "blue_blink" | "green" | "red" | "blue";
 export function setLed(mode: LedMode): void {
   try {
@@ -65,10 +65,10 @@ export function setLed(mode: LedMode): void {
   }
 }
 
-/** WS 接続(あれば report もここから送る) */
+/** WS connection (reports are also sent through it if present) */
 let sharedWs: WebSocket | null = null;
 
-/** 母艦イベントを購読する。戻り値は解除関数 */
+/** Subscribe to host events. Returns an unsubscribe function */
 export function subscribe(handler: (e: TerminalEvent) => void): () => void {
   const onObj = (d: unknown) => {
     if (d && typeof d === "object" && "type" in (d as object)) {
@@ -76,7 +76,7 @@ export function subscribe(handler: (e: TerminalEvent) => void): () => void {
     }
   };
 
-  // 1) シェルからの直接注入
+  // 1) Direct injection from the shell
   window.__facepayEvent = (json: string) => {
     try {
       onObj(JSON.parse(json));
@@ -85,7 +85,7 @@ export function subscribe(handler: (e: TerminalEvent) => void): () => void {
     }
   };
 
-  // 2) 開発時の postMessage 注入
+  // 2) postMessage injection during development
   const onMsg = (ev: MessageEvent) => {
     const d = ev.data;
     if (d && typeof d === "object" && d.source === SOURCE && d.event) {
@@ -94,7 +94,7 @@ export function subscribe(handler: (e: TerminalEvent) => void): () => void {
   };
   window.addEventListener("message", onMsg);
 
-  // 3) 任意: WebSocket(?ws=<url>)
+  // 3) Optional: WebSocket (?ws=<url>)
   let ws: WebSocket | null = null;
   try {
     const url = new URLSearchParams(window.location.search).get("ws");
@@ -123,10 +123,10 @@ export function subscribe(handler: (e: TerminalEvent) => void): () => void {
   };
 }
 
-/** 母艦へレポートを送る */
+/** Send a report to the host */
 export function report(msg: TerminalReport): void {
   const json = JSON.stringify(msg);
-  // 1) WebSocket 接続があればそこへ(母艦が WS サーバの構成)
+  // 1) Via WebSocket if connected (setup where the host is the WS server)
   try {
     if (sharedWs && sharedWs.readyState === WebSocket.OPEN) {
       sharedWs.send(json);
@@ -135,7 +135,7 @@ export function report(msg: TerminalReport): void {
   } catch {
     /* fallthrough */
   }
-  // 2) シェルのネイティブブリッジ
+  // 2) The shell's native bridge
   try {
     if (window.FacePayNative) {
       window.FacePayNative.report(json);
@@ -144,7 +144,7 @@ export function report(msg: TerminalReport): void {
   } catch {
     /* fallthrough */
   }
-  // 開発時: 記録だけ残す
+  // Development: just log it
   // eslint-disable-next-line no-console
   console.log("[facepay report]", json);
   try {
@@ -154,7 +154,7 @@ export function report(msg: TerminalReport): void {
   }
 }
 
-/** MIST 文字列 → SUI 表示(小数2桁) */
+/** MIST string → SUI display (2 decimals) */
 export function mistToSui(mist: string): string {
   try {
     const m = BigInt(mist);
