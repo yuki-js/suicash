@@ -15,6 +15,8 @@ export const SOURCE = "suicash-facepay";
 
 /** 母艦 → 端末 のイベント */
 export type TerminalEvent =
+  /** カードを検出した瞬間の即時通知(オラクル認証はこの後・数秒)。UI 反応用 */
+  | { type: "detecting" }
   /** カードがタッチされ、オラクルで IDi 認証済み */
   | { type: "card"; idi: string; registered: boolean; balance: string }
   /** カードが離された/セッション終了 → 待機へ */
@@ -48,6 +50,18 @@ declare global {
     __facepayEvent?: (json: string) => void;
     /** シェルが公開する母艦へのレポート口 */
     FacePayNative?: { report(json: string): void };
+    /** シェルが公開する上部 RGB LED 制御 */
+    LedNative?: { set(mode: string): void };
+  }
+}
+
+/** 上部 LED を設定(シェルが無い開発環境では no-op) */
+export type LedMode = "off" | "blue_blink" | "green" | "red" | "blue";
+export function setLed(mode: LedMode): void {
+  try {
+    window.LedNative?.set(mode);
+  } catch {
+    /* ignore */
   }
 }
 
