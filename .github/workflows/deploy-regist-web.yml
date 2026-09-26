@@ -1,0 +1,47 @@
+name: Deploy regist-web (self-hosted)
+
+# face-regist の regist-web に変更が push されたら、
+# Kali サーバー上の self-hosted runner でビルドして配信サービスを再起動する。
+on:
+  push:
+    branches: [face-regist]
+    paths:
+      - "regist-web/**"
+      - ".github/workflows/deploy-regist-web.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-regist-web
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, suicash]
+    defaults:
+      run:
+        working-directory: regist-web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install deps
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: Build
+        # トレジャリー鍵や RPC/faucet はビルド時に埋め込む場合ここで渡す
+        # (GitHub の Secrets/Variables から)。省略時は実行時の URL/localStorage 注入でも可。
+        env:
+          VITE_TREASURY_SECRET: ${{ secrets.VITE_TREASURY_SECRET }}
+          VITE_SUI_RPC: ${{ vars.VITE_SUI_RPC }}
+          VITE_SUI_FAUCET: ${{ vars.VITE_SUI_FAUCET }}
+        run: npm run build
+
+      - name: Restart service
+        # 配信サービスを再起動。runner ユーザーに以下 sudoers を許可しておくこと:
+        #   <runner-user> ALL=(root) NOPASSWD: /usr/bin/systemctl restart suicash-regist-web
+        run: sudo systemctl restart suicash-regist-web

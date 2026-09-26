@@ -1,0 +1,25 @@
+# regist-web 配信サービス(vite preview, ポート 1919)
+# 設置: /etc/systemd/system/suicash-regist-web.service
+#
+# WorkingDirectory は self-hosted runner のワークスペースを指す。
+# runner がここに checkout & build するので、再起動すれば最新 dist が配信される。
+# パスは runner 展開先に合わせて書き換えること:
+#   <runner-home>/actions-runner/_work/<repo>/<repo>/regist-web
+# 例では runner ユーザー=github-runner、リポジトリ名=suicash。
+[Unit]
+Description=SuiCash regist-web (vite preview :1919)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=github-runner
+WorkingDirectory=/home/github-runner/actions-runner/_work/suicash/suicash/regist-web
+# 実行時に注入したい場合(VITE_ 変数はビルド時埋め込みなので、変更時は再ビルドが要る):
+# EnvironmentFile=/etc/suicash-regist-web.env
+ExecStart=/usr/bin/env npm start
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
