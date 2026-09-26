@@ -1,0 +1,90 @@
+// SuiCash アセットの SVG → PNG 書き出しスクリプト。
+//
+//   npm --prefix assets install
+//   npm --prefix assets run generate-png [-- --scale=2]
+//
+// assets/ 以下の *.svg と同名の *.png を書き出す（SVG が正本、PNG は生成物で
+// git 管理しない）。resvg（Rust 製、ネイティブ依存なし）でラスタライズする。
+//
+// ロゴ SVG の <text> は REM の可変フォント（wght 605）で組んであるため、
+// Google Fonts リポジトリから REM[wght].ttf を取得して resvg に渡す。
+// 初回のみネットワークが必要で、TMPDIR にキャッシュする（generate.py と同じ方針）。
+// 手元のフォントを使いたい場合は SUICASH_REM_TTF でパスを指定する。
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { Resvg } from "@resvg/resvg-js";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const REM_URL =
+  "https://raw.githubusercontent.com/google/fonts/main/ofl/rem/REM%5Bwght%5D.ttf";
+const FONT_CACHE = path.join(tmpdir(), "suicash-REM-wght.ttf");
+
+const scaleArg = process.argv.find((a) => a.startsWith("--scale="));
+const SCALE = scaleArg ? Number(scaleArg.split("=")[1]) : 2;
+if (!Number.isFinite(SCALE) || SCALE <= 0) {
+  console.error("usage: node generate-png.mjs [--scale=2]");
+  process.exit(1);
+}
+
+function isFont(buf) {
+  if (buf.length < 4) return false;
+  const magic = buf.subarray(0, 4).toString("binary");
+  return magic === "\x00\x01\x00\x00" || magic === "OTTO" || magic === "true" || magic === "wOFF";
+}
+
+async function resolveRemFont() {
+  const fromEnv = process.env.SUICASH_REM_TTF;
+  if (fromEnv) {
+    const buf = readFileSync(fromEnv);
+    if (!isFont(buf)) throw new Error(`not a font file: ${fromEnv}`);
+    return fromEnv;
+  }
+  try {
+    const cached = readFileSync(FONT_CACHE);
+    if (isFont(cached)) return FONT_CACHE;
+  } catch {
+    // miss → download
+  }
+  console.log(`downloading REM variable font -> ${FONT_CACHE}`);
+  const res = await fetch(REM_URL);
+  if (!res.ok) throw new Error(`failed to download REM font: ${res.status}`);
+  writeFileSync(FONT_CACHE, Buffer.from(await res.arrayBuffer()));
+  const buf = readFileSync(FONT_CACHE);
+  if (!isFont(buf)) throw new Error("downloaded file is not a font (proxy error page?)");
+  return FONT_CACHE;
+}
+
+function findSvgs(dir) {
+  const out = [];
+  for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules") continue;
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) out.push(...findSvgs(full));
+    else if (entry.endsWith(".svg")) out.push(full);
+  }
+  return out.sort();
+}
+
+const fontFile = await resolveRemFont();
+const svgs = findSvgs(HERE);
+if (svgs.length === 0) {
+  console.error("no .svg found under assets/");
+  process.exit(1);
+}
+mkdirSync(path.dirname(FONT_CACHE), { recursive: true });
+
+for (const svgPath of svgs) {
+  const svg = readFileSync(svgPath);
+  const resvg = new Resvg(svg, {
+    fitTo: { mode: "zoom", value: SCALE },
+    font: { fontFiles: [fontFile] },
+  });
+  const png = resvg.render().asPng();
+  const outPath = svgPath.replace(/\.svg$/, ".png");
+  writeFileSync(outPath, png);
+  const rel = path.relative(HERE, outPath);
+  const px = `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}`;
+  console.log(`generated -> ${rel} (${px}, ${(png.length / 1024).toFixed(1)} KB)`);
+}

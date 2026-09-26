@@ -73,6 +73,17 @@ B案の最大の特徴は長い耳、ペンギンの最大の特徴はフリッ�
 
 `viewBox` はインクの範囲を計測して正方形に合わせてある。
 
+## PNG の書き出し
+
+SVG が正本。PNG は生成物で git 管理しない（`.gitignore` 済み）。
+
+```bash
+npm --prefix assets install
+npm --prefix assets run generate-png
+```
+
+詳細は `assets/logo/README.md` の「PNG の書き出し」を参照。
+
 ## 未対応
 
 - 全身 1 ポーズのみ。表情差分・横向き・アニメーション用の分割はまだ無い。

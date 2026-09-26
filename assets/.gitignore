@@ -1,0 +1,5 @@
+# SuiCash アセットの生成物。SVG が正本、PNG は generate-png.mjs で作る。
+**/*.png
+
+# generate-png.mjs 用
+node_modules/

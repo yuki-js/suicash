@@ -157,3 +157,18 @@ python3 -m venv venv
 
 字送りの計算のために、Google Fonts から REM の可変フォントを取得する
 （`TMPDIR` にキャッシュ）。
+
+## PNG の書き出し
+
+SVG が正本。PNG は生成物で git 管理しない（`.gitignore` 済み）。
+
+```bash
+npm --prefix assets install
+npm --prefix assets run generate-png       # 2x を SVG と同名で書き出す
+node assets/generate-png.mjs --scale=3     # 倍率を変える
+```
+
+ロゴの `<text>` は REM（wght 605）で描くため、スクリプトが
+`REM[wght].ttf` を取得して resvg に渡す。初回のみネットワークが必要
+（`TMPDIR` にキャッシュ）。手元のフォントを使う場合は
+`SUICASH_REM_TTF=/path/to/REM.ttf` を指定する。
