@@ -15,11 +15,13 @@ npm run build    # type check + production build
 ### Production: GitHub Pages (auto-deploy)
 
 Pushing to `regist-web/**` on `face-regist` makes Actions
-(`.github/workflows/pages-regist-web.yml`) build and publish to GitHub Pages.
+(`.github/workflows/pages.yml`, published under `/app/` together with the `site/` landing page)
+build and publish to GitHub Pages.
 **HTTPS is provided automatically**, so card camera OCR on phones (`getUserMedia`
 requires a secure context) just works. No server, Docker, or SSH needed.
 
-- Public URL: **https://yuki-js.github.io/suicash/**
+- Public URL: **https://yuki-js.github.io/suicash/app/** (the root is the `site/` landing page;
+  old-URL links with `?treasury=` etc. are redirected to `/app/`)
 - One-time setup on GitHub: Settings → Pages → Build and deployment →
   **Source: GitHub Actions**
 - Since we publish from `face-regist` (not the default branch), if the

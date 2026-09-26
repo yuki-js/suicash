@@ -1,16 +1,19 @@
-name: Deploy regist-web to GitHub Pages
+name: Deploy site + regist-web to GitHub Pages
 
-# When regist-web/** on main is pushed (or merged), Actions builds and
-# publishes it to GitHub Pages (served over HTTPS, so camera OCR works).
+# When site/** or regist-web/** on main is pushed (or merged), Actions bundles
+# them into one artifact and publishes it to GitHub Pages (served over HTTPS, so camera OCR works).
+#   /      … site/ (landing page; static HTML, no build step)
+#   /app/  … regist-web/dist (registration site)
 # main is the default branch, so the github-pages environment's default policy
 # allows it and we can deploy without touching environment branch protection.
-# Public URL: https://yuki-js.github.io/suicash/
+# Public URL: https://yuki-js.github.io/suicash/ (registration site at …/suicash/app/)
 on:
   push:
     branches: [main]
     paths:
+      - "site/**"
       - "regist-web/**"
-      - ".github/workflows/pages-regist-web.yml"
+      - ".github/workflows/pages.yml"
   workflow_dispatch: {}
 
 permissions:
@@ -50,14 +53,18 @@ jobs:
           VITE_SUI_FAUCET: ${{ vars.VITE_SUI_FAUCET }}
         run: npm run build
 
-      - name: SPA fallback + disable Jekyll
+      - name: Assemble site (/ = site, /app/ = regist-web)
+        working-directory: .
         run: |
-          cp dist/index.html dist/404.html
-          touch dist/.nojekyll
+          mkdir -p _site
+          cp -r site/. _site/
+          rm -f _site/README.md
+          cp -r regist-web/dist _site/app
+          touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: regist-web/dist
+          path: _site
 
   deploy:
     needs: build
