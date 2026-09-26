@@ -1,1 +1,4 @@
 /face-auth-ui/node_modules
+
+# Claude Code のローカル worktree(コミットしない)
+.claude/worktrees/
