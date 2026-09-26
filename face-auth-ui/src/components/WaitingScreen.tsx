@@ -22,6 +22,12 @@ export function WaitingScreen({ payment }: Props) {
       <p className="waiting__sub">
         Suica / PASMO をリーダーにかざしてください
       </p>
+      <img
+        className="waiting__tapgif"
+        src="/suicash-card-in.gif"
+        alt=""
+        aria-hidden="true"
+      />
     </div>
   );
 }

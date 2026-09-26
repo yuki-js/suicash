@@ -817,15 +817,15 @@ body {
 
 .waiting__cardface {
   display: block;
-  width: 224px;
+  width: 172px;
   height: auto;
   filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
-  animation: cardbob 2.4s ease-in-out infinite;
 }
 
-@keyframes cardbob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(10px); }
+.waiting__tapgif {
+  display: block;
+  width: 168px;
+  height: auto;
 }
 
 .waiting__title {
