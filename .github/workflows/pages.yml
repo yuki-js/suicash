@@ -1,16 +1,19 @@
-name: Deploy regist-web to GitHub Pages
+name: Deploy site + regist-web to GitHub Pages
 
-# main の regist-web/** に push(またはマージ)されると、Actions がビルドして
-# GitHub Pages に公開する(HTTPS 付き = カメラ OCR も動く)。
+# main の site/** か regist-web/** に push(またはマージ)されると、Actions が
+# 1 つの成果物にまとめて GitHub Pages に公開する(HTTPS 付き = カメラ OCR も動く)。
+#   /      … site/(紹介ランディングページ・ビルド不要の静的 HTML)
+#   /app/  … regist-web/dist(登録サイト)
 # main はデフォルトブランチなので github-pages 環境の既定ポリシーで許可され、
 # 環境のブランチ保護設定を触らずにデプロイできる。
-# 公開 URL: https://yuki-js.github.io/suicash/
+# 公開 URL: https://yuki-js.github.io/suicash/ (登録サイトは …/suicash/app/)
 on:
   push:
     branches: [main]
     paths:
+      - "site/**"
       - "regist-web/**"
-      - ".github/workflows/pages-regist-web.yml"
+      - ".github/workflows/pages.yml"
   workflow_dispatch: {}
 
 permissions:
@@ -50,14 +53,18 @@ jobs:
           VITE_SUI_FAUCET: ${{ vars.VITE_SUI_FAUCET }}
         run: npm run build
 
-      - name: SPA fallback + disable Jekyll
+      - name: Assemble site (/ = site, /app/ = regist-web)
+        working-directory: .
         run: |
-          cp dist/index.html dist/404.html
-          touch dist/.nojekyll
+          mkdir -p _site
+          cp -r site/. _site/
+          rm -f _site/README.md
+          cp -r regist-web/dist _site/app
+          touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: regist-web/dist
+          path: _site
 
   deploy:
     needs: build

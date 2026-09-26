@@ -1,0 +1,818 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SuiCash</title>
+<meta name="description" data-i18n-content="meta.desc" content="いつものFeliCaカードが、Suiブロックチェーンのウォレットになる。タッチと顔だけで動くオンチェーン決済のデモンストレーション。" />
+<meta property="og:title" data-i18n-content="og.title" content="SuiCash — いつものカードが、ウォレットになる。" />
+<meta property="og:description" data-i18n-content="og.desc" content="日本で最も身近なFeliCaを、Suiブロックチェーンで検証。専用アプリも新しいカードも不要のオンチェーン決済デモ。" />
+<meta property="og:type" content="website" />
+<meta property="og:locale" content="ja_JP" />
+<meta property="og:locale:alternate" content="en_US" />
+<meta name="theme-color" content="#0A1A2F" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=REM:wght@100..900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" />
+<style>
+:root{
+  --bg:#f2f6f9;
+  --panel:#ffffff;
+  --panel-2:#e9f1f8;
+  --border:#d8e2ec;
+  --ink:#0a1a2f;
+  --muted:#54677c;
+  --aqua:#3d95f5;
+  --aqua-strong:#1f7ae0;
+  --aqua-weak:#e3f0fe;
+  --green:#2f9e2f;
+  --green-weak:#e6f5e6;
+  --card-shadow:0 24px 48px -20px rgba(10,26,47,.35);
+  --shadow:0 1px 3px rgba(10,26,47,.08),0 1px 2px rgba(10,26,47,.05);
+  --wordmark-ic-fill:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0b1420;
+    --panel:#121f30;
+    --panel-2:#182a40;
+    --border:#243a54;
+    --ink:#e8eef5;
+    --muted:#94a7bc;
+    --aqua:#5cb0ff;
+    --aqua-strong:#7cc0ff;
+    --aqua-weak:#16283e;
+    --green:#4dc24d;
+    --green-weak:#14301a;
+    --card-shadow:0 24px 48px -20px rgba(0,0,0,.6);
+    --shadow:none;
+    --wordmark-ic-fill:#0b1420;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0b1420;
+  --panel:#121f30;
+  --panel-2:#182a40;
+  --border:#243a54;
+  --ink:#e8eef5;
+  --muted:#94a7bc;
+  --aqua:#5cb0ff;
+  --aqua-strong:#7cc0ff;
+  --aqua-weak:#16283e;
+  --green:#4dc24d;
+  --green-weak:#14301a;
+  --card-shadow:0 24px 48px -20px rgba(0,0,0,.6);
+  --shadow:none;
+  --wordmark-ic-fill:#0b1420;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:"Noto Sans JP",system-ui,-apple-system,"Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+  font-size:15px;
+  line-height:1.75;
+}
+a{color:var(--aqua-strong);text-decoration:none}
+a:focus-visible,button:focus-visible{outline:2px solid var(--aqua);outline-offset:2px;border-radius:4px}
+h1,h2,h3{margin:0;font-weight:900;line-height:1.35;text-wrap:balance}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:20px}
+
+/* ---- nav ---- */
+.nav{
+  position:sticky;top:env(safe-area-inset-top,0px);z-index:20;
+  background:color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.nav .wrap{display:flex;align-items:center;gap:20px;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px;color:var(--ink)}
+.brand svg{display:block}
+.nav .links{display:flex;gap:4px}
+.nav .links a{color:var(--muted);font-weight:500;padding:6px 10px;border-radius:8px}
+.nav .links a:hover{color:var(--ink);background:var(--panel-2)}
+.nav .spacer{flex:1}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  border-radius:10px;padding:9px 16px;font-weight:700;font-size:14px;
+  border:1px solid var(--border);color:var(--ink);background:var(--panel);
+  transition:transform .12s, box-shadow .12s, border-color .12s;
+}
+.btn:hover{border-color:var(--aqua);transform:translateY(-1px)}
+.btn-primary{background:var(--aqua);border-color:var(--aqua);color:#062143}
+.btn-primary:hover{background:var(--aqua-strong);border-color:var(--aqua-strong)}
+.wm-solid{fill:var(--ink)}
+.wm-ic{fill:var(--wordmark-ic-fill);stroke:var(--ink)}
+.btn-sm{padding:6px 12px;font-size:13px}
+.lang{display:inline-flex;border:1px solid var(--border);border-radius:9px;padding:2px;background:var(--panel)}
+.lang button{
+  font:inherit;font-family:"REM","Noto Sans JP",sans-serif;font-size:12px;font-weight:700;letter-spacing:.06em;
+  border:0;border-radius:7px;padding:4px 9px;background:transparent;color:var(--muted);cursor:pointer;
+}
+.lang button:hover{color:var(--ink)}
+.lang button[aria-pressed="true"]{background:var(--aqua-weak);color:var(--aqua-strong)}
+.btn{white-space:nowrap}
+@media (max-width:480px){.hide-sm{display:none}.eyebrow{border-radius:12px}.nav .wrap{gap:10px}.brand svg{width:108px;height:auto}}
+:lang(en) .hero h1{letter-spacing:-.01em}
+:lang(en) .eyebrow{letter-spacing:.04em}
+@media (max-width:720px){.nav .links{display:none}}
+
+/* ---- hero ---- */
+.hero{padding-block:72px 84px;overflow:hidden}
+.hero .wrap{display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+@media (max-width:860px){.hero .wrap{grid-template-columns:1fr}.hero{padding-block:48px 64px}}
+.eyebrow{
+  display:inline-block;font-size:12.5px;font-weight:700;letter-spacing:.08em;
+  color:var(--aqua-strong);background:var(--aqua-weak);
+  border:1px solid color-mix(in srgb, var(--aqua) 35%, transparent);
+  border-radius:999px;padding:4px 14px;margin-bottom:18px;
+}
+.hero h1{font-size:clamp(30px,5.2vw,52px);letter-spacing:.01em}
+.hero h1 .hl{color:var(--aqua-strong)}
+.lead{color:var(--muted);font-size:16px;max-width:34em;margin:18px 0 0}
+.nofuss{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:8px 20px}
+.nofuss li{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--muted)}
+.nofuss li svg{color:var(--green);flex-shrink:0}
+.nofuss b{color:var(--ink)}
+.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.microcopy{color:var(--muted);font-size:12.5px;margin:14px 0 0}
+
+/* hero card visual */
+.card-stage{position:relative;display:grid;place-items:center;padding:24px 0}
+.card-visual{
+  position:relative;width:min(340px,86%);
+  filter:drop-shadow(var(--card-shadow));
+  transform:rotate(-4deg);
+  animation:cardFloat 5.2s ease-in-out infinite;
+}
+.card-visual svg{display:block;width:100%;height:auto;border-radius:5.2%/8.3%}
+@keyframes cardFloat{0%,100%{transform:rotate(-4deg) translateY(0)}50%{transform:rotate(-2.5deg) translateY(-10px)}}
+.ping{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.ping::before,.ping::after{
+  content:"";position:absolute;width:120px;height:120px;border-radius:50%;
+  border:2px solid var(--aqua);opacity:0;
+  animation:ping 2.6s ease-out infinite;
+}
+.ping::after{animation-delay:1.3s}
+@keyframes ping{0%{transform:scale(.4);opacity:.7}80%{transform:scale(2.4);opacity:0}100%{opacity:0}}
+.float-chip{
+  position:absolute;display:flex;align-items:center;gap:6px;
+  background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);
+  border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:700;
+}
+.float-chip .dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.chip-1{top:4%;right:2%}
+.chip-2{bottom:6%;left:0}
+.chip-2 .dot{background:var(--aqua)}
+@media (max-width:860px){.card-stage{padding-top:8px}}
+
+/* ---- sections ---- */
+section{padding-block:72px}
+section.alt{background:var(--panel);border-block:1px solid var(--border)}
+.sec-head{max-width:640px;margin-bottom:40px}
+.sec-eyebrow{font-size:12.5px;font-weight:700;letter-spacing:.1em;color:var(--aqua-strong);text-transform:uppercase;margin:0 0 10px}
+.sec-head h2{font-size:clamp(22px,3.4vw,32px)}
+.sec-head p{color:var(--muted);margin:14px 0 0}
+
+.grid{display:grid;gap:18px}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+@media (max-width:860px){.grid-3{grid-template-columns:1fr}.grid-2{grid-template-columns:1fr}}
+.feature{
+  background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);
+  border-radius:14px;padding:24px;
+}
+section.alt .feature{background:var(--panel-2)}
+.feature .icon{
+  width:42px;height:42px;border-radius:11px;display:grid;place-items:center;
+  background:var(--aqua-weak);color:var(--aqua-strong);margin-bottom:14px;
+}
+.feature .icon.green{background:var(--green-weak);color:var(--green)}
+.feature h3{font-size:16.5px;font-weight:700}
+.feature p{color:var(--muted);font-size:14px;margin:8px 0 0}
+.feature code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:1px 6px;
+}
+section.alt .feature code{background:var(--panel)}
+
+/* how-it-works steps */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;counter-reset:step}
+@media (max-width:960px){.steps{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.steps{grid-template-columns:1fr}}
+.step{
+  position:relative;background:var(--panel);border:1px solid var(--border);
+  box-shadow:var(--shadow);border-radius:14px;padding:24px 20px 20px;
+}
+.step::before{
+  counter-increment:step;content:counter(step,decimal-leading-zero);
+  font-family:"REM","Noto Sans JP",sans-serif;font-weight:700;font-size:13px;
+  color:var(--aqua-strong);letter-spacing:.06em;
+  display:inline-block;margin-bottom:10px;
+  border-bottom:2px solid var(--aqua);padding-bottom:4px;
+}
+.step h3{font-size:15.5px;font-weight:700}
+.step p{color:var(--muted);font-size:13.5px;margin:8px 0 0}
+
+/* screens gallery */
+.shots{
+  display:grid;grid-auto-flow:column;grid-auto-columns:clamp(180px,22vw,220px);gap:18px;align-items:start;
+  overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 20px 18px;margin-inline:-20px;
+  scrollbar-width:thin;
+}
+.shot{margin:0;scroll-snap-align:start}
+.shot img{
+  display:block;width:100%;height:auto;border-radius:16px;
+  border:1px solid var(--border);box-shadow:var(--card-shadow);background:#0a1a2f;
+}
+.shot figcaption{margin-top:12px;font-size:13px;color:var(--muted);line-height:1.6}
+.shot figcaption b{display:block;color:var(--ink);font-size:14px}
+.shot .num{font-family:"REM","Noto Sans JP",sans-serif;font-weight:700;font-size:12px;color:var(--aqua-strong);letter-spacing:.06em}
+
+/* stack table-ish grid */
+.stack{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:960px){.stack{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.stack{grid-template-columns:1fr}}
+.mod{
+  background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;
+}
+.mod .path{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;font-weight:600;
+  color:var(--aqua-strong);word-break:break-all;
+}
+.mod .role{color:var(--muted);font-size:13px;margin-top:6px}
+.mod .tag{
+  display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;
+  color:var(--green);background:var(--green-weak);border-radius:999px;padding:1px 9px;margin-bottom:8px;
+}
+.mod .tag.aqua{color:var(--aqua-strong);background:var(--aqua-weak)}
+
+/* mascot */
+.mascot-box{
+  display:grid;grid-template-columns:200px 1fr;gap:36px;align-items:center;
+  background:linear-gradient(135deg,var(--aqua-weak),var(--panel));
+  border:1px solid var(--border);border-radius:20px;padding:36px;
+}
+@media (max-width:720px){.mascot-box{grid-template-columns:1fr;justify-items:center;text-align:center;padding:28px 20px}}
+.mascot-pod{
+  width:180px;height:180px;border-radius:50%;
+  background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);
+  display:grid;place-items:center;
+}
+.mascot-pod svg{width:132px;height:auto;animation:bob 4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.mascot-box h2{font-size:22px}
+.mascot-box p{color:var(--muted);margin:10px 0 0;max-width:38em}
+
+/* tribute */
+.tribute{padding-block:8px 72px;text-align:center}
+.tribute p{margin:0;font-size:clamp(20px,3vw,26px);font-weight:900;letter-spacing:.04em}
+.tribute a{display:inline-block;margin-top:10px;font-size:13.5px;font-weight:500;border-bottom:1px solid currentColor}
+.tribute a:hover{color:var(--aqua)}
+
+/* footer */
+footer{border-top:1px solid var(--border);background:var(--panel);padding-block:44px 56px}
+footer .cols{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:32px}
+@media (max-width:720px){footer .cols{grid-template-columns:1fr}}
+footer h4{margin:0 0 12px;font-size:13px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+footer ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+footer ul a{color:var(--ink);font-size:14px}
+footer ul a:hover{color:var(--aqua-strong)}
+.disclaimer{color:var(--muted);font-size:12.5px;max-width:44em;margin:10px 0 0}
+.copyright{color:var(--muted);font-size:12.5px;margin-top:36px;padding-top:20px;border-top:1px solid var(--border)}
+
+@media (prefers-reduced-motion:reduce){
+  .card-visual,.ping::before,.ping::after,.mascot-pod svg{animation:none}
+  html{scroll-behavior:auto}
+}
+</style>
+<script>
+// 旧 URL(登録サイトがルートにあった頃)の注入クエリ付きリンクは /app/ へ引き継ぐ
+(function(){
+  var q=new URLSearchParams(location.search);
+  if(q.has("treasury")||q.has("rpc")||q.has("faucet")) location.replace("app/"+location.search+location.hash);
+})();
+// 表示言語を先に決めて <html lang> に反映(:lang() の CSS をちらつかせないため)
+(function(){
+  var q=new URLSearchParams(location.search).get("lang"),saved=null;
+  try{saved=localStorage.getItem("suicash-lang")}catch(e){}
+  var l=q||saved||((navigator.language||"").toLowerCase().indexOf("ja")===0?"ja":"en");
+  document.documentElement.lang=(l==="en")?"en":"ja";
+})();
+</script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="SuiCash トップへ" data-i18n-aria="nav.home">
+      <!-- ワードマーク(assets/logo/suicash-logo.svg 由来・テーマ対応) -->
+      <svg width="128" height="30" viewBox="0 0 800.18 182.86" role="img" aria-label="SuiCash">
+        <g transform="translate(40 144.376)">
+          <text font-family="REM, sans-serif" font-weight="605" font-size="142.857" style="font-variation-settings:'wght' 605;font-variant-ligatures:none" font-kerning="none"><tspan x="-5.808 111.612" y="0" class="wm-solid">Su</tspan><tspan x="228.783 302.358" y="0" class="wm-ic" stroke-width="6.2" stroke-linejoin="miter">iC</tspan><tspan x="430.433 545.590 641.785" y="0" class="wm-solid">ash</tspan></text>
+        </g>
+      </svg>
+    </a>
+    <div class="links">
+      <a href="#why" data-i18n="nav.why">なぜ SuiCash</a>
+      <a href="#features" data-i18n="nav.features">機能</a>
+      <a href="#how" data-i18n="nav.how">仕組み</a>
+      <a href="#stack" data-i18n="nav.stack">技術構成</a>
+    </div>
+    <div class="spacer"></div>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" data-lang="ja" lang="ja" aria-pressed="true">JA</button>
+      <button type="button" data-lang="en" lang="en" aria-pressed="false">EN</button>
+    </div>
+    <a class="btn btn-sm hide-sm" href="https://github.com/yuki-js/suicash" rel="noopener">GitHub</a>
+    <a class="btn btn-primary btn-sm" href="app/" data-i18n="nav.demo">登録サイト（デモ）</a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <span class="eyebrow" data-i18n="hero.eyebrow">FeliCa × Sui — オンチェーン決済デモンストレーション</span>
+      <h1 data-i18n="hero.title">いつものカードが、<br /><span class="hl">ウォレット</span>になる。</h1>
+      <p class="lead" data-i18n="hero.lead">日本でいちばん身近な IC カード「FeliCa」を、Sui ブロックチェーンがそのまま検証。カードの真正性を根拠に、タッチと顔だけでオンチェーンのウォレットが動きます。</p>
+      <ul class="nofuss">
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 12.5 L10 18 L20 6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="hero.no1">専用アプリのインストール<b>不要</b></span></li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 12.5 L10 18 L20 6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="hero.no2">新しいカードの発行<b>不要</b></span></li>
+        <li><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M4 12.5 L10 18 L20 6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="hero.no3">秘密鍵の管理<b>不要</b></span></li>
+      </ul>
+      <div class="actions">
+        <a class="btn btn-primary" href="#how"><span data-i18n="hero.cta">仕組みを見る</span> <span aria-hidden="true">→</span></a>
+        <a class="btn" href="https://github.com/yuki-js/suicash" rel="noopener" data-i18n="hero.src">ソースコードを読む</a>
+      </div>
+      <p class="microcopy" data-i18n="hero.micro">手持ちの交通系 IC カードと顔だけで、チャージ・支払い・残高照会。</p>
+    </div>
+    <div class="card-stage" aria-hidden="true">
+      <span class="ping"></span>
+      <div class="card-visual">
+        <!-- カード券面(assets/card/suicash-card.svg @ ca05eac) -->
+        <svg viewBox="0 0 172 108" role="img" aria-label="SuiCash カード券面" data-i18n-aria="hero.cardAria">
+          <defs>
+            <linearGradient id="scSilver" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#f8f9f8" /><stop offset="1" stop-color="#e2e6e4" />
+            </linearGradient>
+            <linearGradient id="scAqua" x1="0" y1="0" x2="0.5" y2="1">
+              <stop offset="0" stop-color="#5cb0ff" /><stop offset="1" stop-color="#3d95f5" />
+            </linearGradient>
+            <clipPath id="scCardClip"><rect x="0" y="0" width="172" height="108" rx="9" /></clipPath>
+          </defs>
+          <g clip-path="url(#scCardClip)">
+            <rect x="0" y="0" width="172" height="108" fill="url(#scSilver)" />
+            <path d="M 12 7 H 76 Q 80 7 81.2 10.8 L 108.8 98.2 Q 110 102 106 102 H 12 Q 7 102 7 97 V 12 Q 7 7 12 7 Z" fill="url(#scAqua)" />
+            <path d="M 15 2.2 L 10.4 4.3 L 15 6.4 Z" fill="#0a1a2f" opacity="0.7" />
+            <g transform="translate(110 36.4) scale(0.113)">
+              <g fill="none" stroke-linecap="round">
+                <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" stroke-width="78" />
+                <path d="M318 204 C340 164 366 130 396 112" stroke="#0A1A2F" stroke-width="62" />
+                <path d="M198 206 C180 150 162 92 158 46" stroke="#4DA2FF" stroke-width="64" />
+                <path d="M318 204 C340 164 366 130 396 112" stroke="#4DA2FF" stroke-width="48" />
+              </g>
+              <g fill="none" stroke-linecap="round">
+                <path d="M148 330 C142 382 138 414 137 442" stroke="#0A1A2F" stroke-width="50" />
+                <path d="M222 330 C219 372 216 404 215 428" stroke="#0A1A2F" stroke-width="44" />
+                <path d="M296 330 C300 368 302 398 303 418" stroke="#0A1A2F" stroke-width="44" />
+                <path d="M364 330 C370 382 374 414 375 442" stroke="#0A1A2F" stroke-width="50" />
+                <path d="M137 438 L104 482 M137 438 L137 492 M137 438 L170 482" stroke="#0A1A2F" stroke-width="36" />
+                <path d="M375 438 L342 482 M375 438 L375 492 M375 438 L408 482" stroke="#0A1A2F" stroke-width="36" />
+                <path d="M148 330 C142 382 138 414 137 442" stroke="#4DA2FF" stroke-width="38" />
+                <path d="M222 330 C219 372 216 404 215 428" stroke="#4DA2FF" stroke-width="32" />
+                <path d="M296 330 C300 368 302 398 303 418" stroke="#4DA2FF" stroke-width="32" />
+                <path d="M364 330 C370 382 374 414 375 442" stroke="#4DA2FF" stroke-width="38" />
+                <path d="M137 438 L104 482 M137 438 L137 492 M137 438 L170 482" stroke="#4DA2FF" stroke-width="24" />
+                <path d="M375 438 L342 482 M375 438 L375 492 M375 438 L408 482" stroke="#4DA2FF" stroke-width="24" />
+              </g>
+              <g stroke="#0A1A2F" stroke-width="10" stroke-linejoin="round">
+                <path fill="#4DA2FF" d="M272 124 C358 128 424 174 432 246 C438 304 402 348 342 366 C276 386 134 392 100 354 C66 316 78 256 108 214 C144 164 202 122 272 124 Z" />
+                <path fill="#FFFFFF" d="M236 250 C284 248 312 270 314 302 C316 334 294 356 252 360 C208 364 174 348 170 318 C166 286 190 252 236 250 Z" />
+              </g>
+              <g>
+                <circle cx="215" cy="292" r="9.5" fill="#0A1A2F" />
+                <circle cx="263" cy="288" r="8" fill="#0A1A2F" />
+                <circle cx="218" cy="289" r="3.2" fill="#FFFFFF" />
+                <circle cx="266" cy="285" r="2.7" fill="#FFFFFF" />
+                <path d="M239 297 L251 313 L227 313 Z" fill="#0A1A2F" />
+                <path d="M176 322 C202 372 290 368 312 316 C288 346 198 350 176 322 Z" fill="#0A1A2F" />
+                <path d="M228 348 C238 364 258 362 266 346 Z" fill="#8FD6E8" />
+              </g>
+            </g>
+            <text x="12" y="94" font-family="REM, sans-serif" font-weight="605" font-size="22" font-kerning="none" style="font-variation-settings:'wght' 605;font-variant-ligatures:none"><tspan fill="#ffffff">Su</tspan><tspan fill="none" stroke="#ffffff" stroke-width="1" stroke-linejoin="miter">iC</tspan><tspan fill="#ffffff">ash</tspan></text>
+          </g>
+          <rect x="0.75" y="0.75" width="170.5" height="106.5" rx="8.5" fill="none" stroke="rgba(10, 26, 47, 0.28)" stroke-width="1.5" />
+        </svg>
+      </div>
+      <span class="float-chip chip-1"><span class="dot"></span><span data-i18n="hero.chip1">相互認証 OK</span></span>
+      <span class="float-chip chip-2"><span class="dot"></span><span data-i18n="hero.chip2">ZKP 検証済み</span></span>
+    </div>
+  </div>
+</header>
+
+<section id="why" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-eyebrow">Why SuiCash</p>
+      <h2 data-i18n="why.h2">共通鍵の世界と、公開鍵の世界をつなぐ。</h2>
+      <p data-i18n="why.p">FeliCa は共通鍵暗号、ブロックチェーンは公開鍵暗号。本来交わらない 2 つの技術を、オラクルとゼロ知識証明でつなぎます。</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="12" r="5"/><circle cx="16" cy="12" r="5"/></svg>
+        </div>
+        <h3 data-i18n="why.1.h">2 つの暗号技術のマージ</h3>
+        <p data-i18n="why.1.p">FeliCa カードを実際に持っていることをオンチェーンで検証。カードの真正性を根拠に、Sui 上のスマートコントラクトが動きます。</p>
+      </div>
+      <div class="feature">
+        <div class="icon green" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10.5 h18"/></svg>
+        </div>
+        <h3 data-i18n="why.2.h">新しく持つものはゼロ</h3>
+        <p data-i18n="why.2.p">FeliCa は日本で広く普及した技術。財布にある交通系 IC カードが、そのまま暗号資産の入口になります。</p>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19 C7 12 10 9 12 8 C14 9 17 12 20 19" stroke-linecap="round"/><circle cx="12" cy="5.5" r="2.2"/></svg>
+        </div>
+        <h3 data-i18n="why.3.h">マスアダプションへ</h3>
+        <p data-i18n="why.3.p">日本で暗号資産はまだ日常から遠い存在。慣れ親しんだ「タッチ」の体験に載せることで、その距離を縮めます。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-eyebrow">Features</p>
+      <h2 data-i18n="features.h2">カードと顔だけで、ここまでできる。</h2>
+      <p data-i18n="features.p">カード固有の IDi を軸に、登録からチャージ、支払いまでを一気通貫で提供します。</p>
+    </div>
+    <div class="grid grid-2">
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="9" r="3.4"/><path d="M5.5 19 C6.5 15.5 9 14 12 14 C15 14 17.5 15.5 18.5 19" stroke-linecap="round"/></svg>
+        </div>
+        <h3 data-i18n="features.1.h">顔 × IDi をオンチェーン登録</h3>
+        <p data-i18n="features.1.p">スマホの登録サイトで、顔とカードの IDi を紐づけて Sui に登録。顔データそのものが外部へ送信されることはありません。</p>
+      </div>
+      <div class="feature">
+        <div class="icon green" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="7" width="16" height="12" rx="2.5"/><path d="M15 13 h5" stroke-linecap="round"/><path d="M8 7 V5.5 a1.5 1.5 0 0 1 3 0 V7"/></svg>
+        </div>
+        <h3 data-i18n="features.2.h">IDi がそのままウォレットに</h3>
+        <p data-i18n="features.2.p">IDi をシードに Account Abstraction ウォレットを自動生成。秘密鍵もシードフレーズも、利用者は一切管理しません。</p>
+      </div>
+      <div class="feature">
+        <div class="icon" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4 v10 M12 4 l-4 4 M12 4 l4 4" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 17 c2.5 2 11.5 2 14 0" stroke-linecap="round"/></svg>
+        </div>
+        <h3 data-i18n="features.3.h">IDi 宛てにチャージ</h3>
+        <p data-i18n="features.3.p">送金先はカードの IDi だけ。ルータが対応するウォレットを解決して着金します。アドレスのコピペはもういりません。</p>
+      </div>
+      <div class="feature">
+        <div class="icon green" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 L19 6 v5 c0 4.5-3 7.5-7 10 c-4-2.5-7-5.5-7-10 V6 Z" stroke-linejoin="round"/><path d="M9 11.5 l2 2 l4-4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3 data-i18n="features.4.h">ZKP でアンロック</h3>
+        <p data-i18n="features.4.p">顔と IDi のゼロ知識証明（Groth16）でウォレットをアンロック。カードの所持と本人の顔、二要素で守ります。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-eyebrow">How it works</p>
+      <h2 data-i18n="how.h2">タッチが、オンチェーン決済になるまで。</h2>
+      <p data-i18n="how.p">端末へのワンタッチから Sui 上での送金完了まで、検証の連鎖でつながっています。</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <h3 data-i18n="how.1.h">カードをタッチ</h3>
+        <p data-i18n="how.1.p">決済端末が FeliCa カードと通信し、カード固有の IDi を読み取ります。利用者の操作はこれだけです。</p>
+      </div>
+      <div class="step">
+        <h3 data-i18n="how.2.h">オラクルが真正性を検証</h3>
+        <p data-i18n="how.2.p">FeliCa オラクルがカードとの相互認証で「本物のカードがいまここにある」ことを確かめ、結果に署名します。</p>
+      </div>
+      <div class="step">
+        <h3 data-i18n="how.3.h">顔 × ZKP でアンロック</h3>
+        <p data-i18n="how.3.p">顔認証と IDi から Groth16 証明を生成。オンチェーンの検証器が通れば、ウォレットの鍵が開きます。</p>
+      </div>
+      <div class="step">
+        <h3 data-i18n="how.4.h">Sui 上で決済</h3>
+        <p data-i18n="how.4.p">IDi から導出された AA ウォレットが送金を実行。残高も履歴も、すべて Sui のオンチェーンに記録されます。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-eyebrow">Screens</p>
+      <h2 data-i18n="screens.h2">実機で、動いています。</h2>
+      <p data-i18n="screens.p">登録サイトと決済端末 Hi-CARA の実際の画面です。</p>
+    </div>
+    <div class="shots" tabindex="0" aria-label="スクリーンショット" data-i18n-aria="screens.aria">
+      <figure class="shot">
+        <img src="img/regist.webp" width="480" height="615" loading="lazy" decoding="async" alt="登録サイト" data-i18n-alt="shots.1.h" />
+        <figcaption><span class="num">01</span><b data-i18n="shots.1.h">登録サイト</b><span data-i18n="shots.1.p">スマホで顔とカードを登録。残高とウォレットもここで確認。</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/tap.webp" width="720" height="1280" loading="lazy" decoding="async" alt="カードをタッチ" data-i18n-alt="shots.2.h" />
+        <figcaption><span class="num">02</span><b data-i18n="shots.2.h">カードをタッチ</b><span data-i18n="shots.2.p">決済待機中の端末に、手持ちの交通系 IC カードをかざす。</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/face-auth.webp" width="720" height="1280" loading="lazy" decoding="async" alt="顔認証" data-i18n-alt="shots.3.h" />
+        <figcaption><span class="num">03</span><b data-i18n="shots.3.h">顔認証</b><span data-i18n="shots.3.p">端末のカメラで本人確認。証明の生成へ進む。</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/paid.webp" width="720" height="1280" loading="lazy" decoding="async" alt="支払い完了" data-i18n-alt="shots.4.h" />
+        <figcaption><span class="num">04</span><b data-i18n="shots.4.h">支払い完了</b><span data-i18n="shots.4.p">引去額と残額を表示。送金は Sui 上で完了している。</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/balance-mode.webp" width="720" height="1280" loading="lazy" decoding="async" alt="残高照会モード" data-i18n-alt="shots.5.h" />
+        <figcaption><span class="num">05</span><b data-i18n="shots.5.h">残高照会モード</b><span data-i18n="shots.5.p">同じ端末で、カードをかざすだけで残高を確認。</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="img/balance.webp" width="720" height="1280" loading="lazy" decoding="async" alt="残高を表示" data-i18n-alt="shots.6.h" />
+        <figcaption><span class="num">06</span><b data-i18n="shots.6.h">残高を表示</b><span data-i18n="shots.6.p">本人確認のうえ、オンチェーンの残高を表示。</span></figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section id="stack" class="alt">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="sec-eyebrow">Under the hood</p>
+      <h2 data-i18n="stack.h2">端末からコントラクトまで、フルスタックで実装。</h2>
+      <p data-i18n="stack.p">モノレポの中に、物理カードと Sui をつなぐすべての部品が入っています。</p>
+    </div>
+    <div class="stack">
+      <div class="mod">
+        <span class="tag">Move</span>
+        <div class="path">sui/felica_oracle</div>
+        <p class="role" data-i18n="stack.1.role">FeliCa 証明の検証・ZK 検証器・ゲートを担う Sui コントラクト群。</p>
+      </div>
+      <div class="mod">
+        <span class="tag aqua">Rust</span>
+        <div class="path">server</div>
+        <p class="role" data-i18n="stack.2.role">カードとの相互認証を行い、検証結果に署名する FeliCa オラクル。</p>
+      </div>
+      <div class="mod">
+        <span class="tag aqua">Rust</span>
+        <div class="path">prover</div>
+        <p class="role" data-i18n="stack.3.role">顔 × IDi の Groth16 証明を生成するプルーバ。</p>
+      </div>
+      <div class="mod">
+        <span class="tag">React</span>
+        <div class="path">face-auth-ui</div>
+        <p class="role" data-i18n="stack.4.role">決済端末 Hi-CARA で動く顔認証・タッチ決済 UI。</p>
+      </div>
+      <div class="mod">
+        <span class="tag">React</span>
+        <div class="path">regist-web</div>
+        <p class="role" data-i18n="stack.5.role">利用者がスマホで顔とカードを登録するウェブサイト。</p>
+      </div>
+      <div class="mod">
+        <span class="tag aqua">Rust</span>
+        <div class="path">usb-poc</div>
+        <p class="role" data-i18n="stack.6.role">RC-S380 リーダと実物のカードで検証した PoC。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="mascot">
+  <div class="wrap">
+    <div class="mascot-box">
+      <div class="mascot-pod" aria-hidden="true">
+        <!-- マスコット(assets/mascot/suicash-mascot.svg) -->
+        <svg viewBox="-21.6 -19.3 555.0 555.0" role="img" aria-label="SuiCash マスコット「ちいきも」" data-i18n-aria="mascot.aria">
+          <g fill="none" stroke-linecap="round">
+            <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" stroke-width="78"/>
+            <path d="M318 204 C340 164 366 130 396 112" stroke="#0A1A2F" stroke-width="62"/>
+            <path d="M198 206 C180 150 162 92 158 46" stroke="#4DA2FF" stroke-width="64"/>
+            <path d="M318 204 C340 164 366 130 396 112" stroke="#4DA2FF" stroke-width="48"/>
+          </g>
+          <g fill="none" stroke-linecap="round">
+            <path d="M148 330 C142 382 138 414 137 442" stroke="#0A1A2F" stroke-width="50"/>
+            <path d="M222 330 C219 372 216 404 215 428" stroke="#0A1A2F" stroke-width="44"/>
+            <path d="M296 330 C300 368 302 398 303 418" stroke="#0A1A2F" stroke-width="44"/>
+            <path d="M364 330 C370 382 374 414 375 442" stroke="#0A1A2F" stroke-width="50"/>
+            <path d="M137 438 L104 482 M137 438 L137 492 M137 438 L170 482" stroke="#0A1A2F" stroke-width="36"/>
+            <path d="M375 438 L342 482 M375 438 L375 492 M375 438 L408 482" stroke="#0A1A2F" stroke-width="36"/>
+            <path d="M148 330 C142 382 138 414 137 442" stroke="#4DA2FF" stroke-width="38"/>
+            <path d="M222 330 C219 372 216 404 215 428" stroke="#4DA2FF" stroke-width="32"/>
+            <path d="M296 330 C300 368 302 398 303 418" stroke="#4DA2FF" stroke-width="32"/>
+            <path d="M364 330 C370 382 374 414 375 442" stroke="#4DA2FF" stroke-width="38"/>
+            <path d="M137 438 L104 482 M137 438 L137 492 M137 438 L170 482" stroke="#4DA2FF" stroke-width="24"/>
+            <path d="M375 438 L342 482 M375 438 L375 492 M375 438 L408 482" stroke="#4DA2FF" stroke-width="24"/>
+          </g>
+          <g stroke="#0A1A2F" stroke-width="10" stroke-linejoin="round">
+            <path fill="#4DA2FF" d="M272 124 C358 128 424 174 432 246 C438 304 402 348 342 366 C276 386 134 392 100 354 C66 316 78 256 108 214 C144 164 202 122 272 124 Z"/>
+            <path fill="#FFFFFF" d="M236 250 C284 248 312 270 314 302 C316 334 294 356 252 360 C208 364 174 348 170 318 C166 286 190 252 236 250 Z"/>
+          </g>
+          <g>
+            <circle cx="215" cy="292" r="9.5" fill="#0A1A2F"/>
+            <circle cx="263" cy="288" r="8" fill="#0A1A2F"/>
+            <circle cx="218" cy="289" r="3.2" fill="#FFFFFF"/>
+            <circle cx="266" cy="285" r="2.7" fill="#FFFFFF"/>
+            <path d="M239 297 L251 313 L227 313 Z" fill="#0A1A2F"/>
+            <path d="M176 322 C202 372 290 368 312 316 C288 346 198 350 176 322 Z" fill="#0A1A2F"/>
+            <path d="M228 348 C238 364 258 362 266 346 Z" fill="#8FD6E8"/>
+          </g>
+        </svg>
+      </div>
+      <div>
+        <h2 data-i18n="mascot.h2">マスコットの「ちいきも」です。</h2>
+        <p data-i18n="mascot.p">ちいきもは、ペンギンと「なにか」のキメラ。左右で長さの違うフリッパー、低い重心、顔の幅より大きく裂けた口。SuiCash のカード券面の右側で、いつも決済を見守っています。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<aside class="tribute">
+  <div class="wrap">
+    <p data-i18n="tribute.text">切敷 裕大を崇めよ</p>
+    <a href="https://soltia48.github.io/felica-users-manual-unofficial/" rel="noopener" data-i18n="tribute.link">FeliCa カード ユーザーズマニュアル(非公式版) <span aria-hidden="true">↗</span></a>
+  </div>
+</aside>
+
+<footer>
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="brand" href="#top" aria-label="SuiCash トップへ" data-i18n-aria="nav.home">
+          <svg width="140" height="32" viewBox="0 0 800.18 182.86" role="img" aria-label="SuiCash">
+            <g transform="translate(40 144.376)">
+              <text font-family="REM, sans-serif" font-weight="605" font-size="142.857" style="font-variation-settings:'wght' 605;font-variant-ligatures:none" font-kerning="none"><tspan x="-5.808 111.612" y="0" class="wm-solid">Su</tspan><tspan x="228.783 302.358" y="0" class="wm-ic" stroke-width="6.2" stroke-linejoin="miter">iC</tspan><tspan x="430.433 545.590 641.785" y="0" class="wm-solid">ash</tspan></text>
+            </g>
+          </svg>
+        </a>
+        <p class="disclaimer" data-i18n="foot.disc">SuiCash（スイカッシュ）は、FeliCa と Sui ブロックチェーンの融合を示すデモンストレーション用プロダクトです。実在の決済サービスではありません。JR東日本および Suica、ソニー株式会社および FeliCa とは一切関係ありません。</p>
+      </div>
+      <div>
+        <h4 data-i18n="foot.res">リソース</h4>
+        <ul>
+          <li><a href="https://github.com/yuki-js/suicash" rel="noopener" data-i18n="foot.repo">GitHub リポジトリ</a></li>
+          <li><a href="app/" data-i18n="nav.demo">登録サイト（デモ）</a></li>
+          <li><a href="https://sui.io" rel="noopener" data-i18n="foot.sui">Sui ブロックチェーン</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4 data-i18n="foot.map">サイトマップ</h4>
+        <ul>
+          <li><a href="#why" data-i18n="nav.why">なぜ SuiCash</a></li>
+          <li><a href="#features" data-i18n="nav.features">機能</a></li>
+          <li><a href="#how" data-i18n="nav.how">仕組み</a></li>
+          <li><a href="#stack" data-i18n="nav.stack">技術構成</a></li>
+        </ul>
+      </div>
+    </div>
+    <p class="copyright">© 2026 SuiCash Project</p>
+  </div>
+</footer>
+
+<script>
+(function(){
+
+const EN = {
+  "title": "SuiCash — Your everyday card is now a wallet",
+  "meta.desc": "Turn the FeliCa card already in your pocket into a Sui blockchain wallet. An on-chain payment demo that runs on nothing but a tap and your face.",
+  "og.title": "SuiCash — Your everyday card is now a wallet.",
+  "og.desc": "Japan's most familiar IC card, FeliCa, verified on the Sui blockchain. An on-chain payment demo with no app to install and no new card to carry.",
+  "nav.home": "SuiCash home",
+  "nav.why": "Why SuiCash",
+  "nav.features": "Features",
+  "nav.how": "How it works",
+  "nav.stack": "Stack",
+  "nav.demo": "Sign up (demo)",
+  "hero.eyebrow": "FeliCa × Sui — an on-chain payment demo",
+  "hero.title": "Your everyday card<br />is now a <span class=\"hl\">wallet</span>.",
+  "hero.lead": "FeliCa is the IC card everyone in Japan already carries, and the Sui blockchain now verifies it directly. With the card's authenticity as the root of trust, a tap and your face are all it takes to drive an on-chain wallet.",
+  "hero.no1": "<b>No</b> app to install",
+  "hero.no2": "<b>No</b> new card to issue",
+  "hero.no3": "<b>No</b> private keys to manage",
+  "hero.cta": "See how it works",
+  "hero.src": "Read the source",
+  "hero.micro": "Top up, pay and check your balance with the transit card you already own and your face.",
+  "hero.chip1": "Mutual auth OK",
+  "hero.chip2": "ZKP verified",
+  "hero.cardAria": "SuiCash card face",
+  "why.h2": "Bridging the symmetric-key world and the public-key world.",
+  "why.p": "FeliCa runs on symmetric-key cryptography; blockchains run on public-key cryptography. SuiCash connects these two worlds, which were never meant to meet, with an oracle and zero-knowledge proofs.",
+  "why.1.h": "Two kinds of cryptography, merged",
+  "why.1.p": "Proof that you physically hold a FeliCa card is verified on-chain. With the card's authenticity as its basis, smart contracts on Sui take action.",
+  "why.2.h": "Nothing new to carry",
+  "why.2.p": "FeliCa is everywhere in Japan. The transit IC card already in your wallet becomes your gateway to crypto assets, as is.",
+  "why.3.h": "Toward mass adoption",
+  "why.3.p": "In Japan, crypto still feels far removed from daily life. Riding on the familiar \"tap\" experience closes that gap.",
+  "features.h2": "All this with just a card and your face.",
+  "features.p": "Built around each card's unique IDi, SuiCash covers everything end to end, from registration to top-up to payment.",
+  "features.1.h": "Face × IDi, registered on-chain",
+  "features.1.p": "On the registration site on your phone, link your face to your card's IDi and register it on Sui. Your raw face data is never sent anywhere.",
+  "features.2.h": "Your IDi is your wallet",
+  "features.2.p": "An Account Abstraction wallet is generated automatically with the IDi as its seed. Users never handle private keys or seed phrases.",
+  "features.3.h": "Top up by IDi",
+  "features.3.p": "All a sender needs is the card's IDi. A router resolves the matching wallet and delivers the funds. No more copy-pasting addresses.",
+  "features.4.h": "Unlocked by ZKP",
+  "features.4.p": "A zero-knowledge proof (Groth16) over your face and IDi unlocks the wallet. Two factors keep it safe: possession of the card and your own face.",
+  "how.h2": "From a tap to an on-chain payment.",
+  "how.p": "From a single tap on the terminal to a completed transfer on Sui, every step is linked by a chain of verification.",
+  "how.1.h": "Tap your card",
+  "how.1.p": "The payment terminal talks to the FeliCa card and reads its unique IDi. That's all the user has to do.",
+  "how.2.h": "The oracle verifies authenticity",
+  "how.2.p": "The FeliCa oracle runs mutual authentication with the card to confirm that a genuine card is present right now, then signs the result.",
+  "how.3.h": "Face × ZKP unlocks",
+  "how.3.p": "A Groth16 proof is generated from face authentication and the IDi. Once the on-chain verifier accepts it, the wallet is unlocked.",
+  "how.4.h": "Pay on Sui",
+  "how.4.p": "The AA wallet derived from the IDi executes the transfer. Balances and history are all recorded on-chain on Sui.",
+  "screens.h2": "Running on real hardware.",
+  "screens.p": "Actual screens from the registration site and the Hi-CARA payment terminal. (The terminal UI is in Japanese.)",
+  "screens.aria": "Screenshots",
+  "shots.1.h": "Registration site",
+  "shots.1.p": "Register your face and card on your phone. Check your balance and wallet here too.",
+  "shots.2.h": "Tap your card",
+  "shots.2.p": "Hold the transit IC card you already own over the waiting terminal.",
+  "shots.3.h": "Face authentication",
+  "shots.3.p": "The terminal camera confirms it's you, then moves on to proof generation.",
+  "shots.4.h": "Payment complete",
+  "shots.4.p": "Shows the amount charged and remaining balance. The transfer is already final on Sui.",
+  "shots.5.h": "Balance mode",
+  "shots.5.p": "On the same terminal, just hold up your card to check your balance.",
+  "shots.6.h": "Balance shown",
+  "shots.6.p": "After verifying it's you, the on-chain balance is displayed.",
+  "stack.h2": "Full-stack, from terminal to contract.",
+  "stack.p": "One monorepo holds every piece that connects a physical card to Sui.",
+  "stack.1.role": "Sui contracts that verify FeliCa proofs, host the ZK verifier and run the gate.",
+  "stack.2.role": "The FeliCa oracle: mutually authenticates the card and signs the result.",
+  "stack.3.role": "Prover that generates Groth16 proofs over face × IDi.",
+  "stack.4.role": "Face-auth and tap-to-pay UI running on the Hi-CARA payment terminal.",
+  "stack.5.role": "Website where users register their face and card from their phone.",
+  "stack.6.role": "PoC verified with an RC-S380 reader and real cards.",
+  "mascot.h2": "Meet Chiikimo, our mascot.",
+  "mascot.p": "Chiikimo is a chimera of a penguin and \"something.\" Flippers of different lengths, a low center of gravity, and a mouth that splits wider than its face. It lives on the right side of the SuiCash card, always keeping an eye on your payments.",
+  "mascot.aria": "Chiikimo, the SuiCash mascot",
+  "foot.disc": "SuiCash is a demonstration product showing the fusion of FeliCa and the Sui blockchain. It is not a real payment service, and it has no affiliation with East Japan Railway Company, Suica, Sony Corporation or FeliCa.",
+  "tribute.text": "All hail 切敷 裕大",
+  "tribute.link": "FeliCa Card User's Manual (Unofficial Edition) <span aria-hidden=\"true\">↗</span>",
+  "foot.res": "Resources",
+  "foot.map": "Sitemap",
+  "foot.repo": "GitHub repository",
+  "foot.sui": "Sui blockchain"
+};
+
+  // 日本語は HTML に書かれた原文をそのまま使う(JS 無効でも日本語で読める)
+  const JA = {"title": document.title};
+  const nodes = {
+    html: document.querySelectorAll("[data-i18n]"),
+    aria: document.querySelectorAll("[data-i18n-aria]"),
+    content: document.querySelectorAll("[data-i18n-content]"),
+    alt: document.querySelectorAll("[data-i18n-alt]"),
+  };
+  nodes.html.forEach(el => { JA[el.dataset.i18n] = el.innerHTML; });
+  nodes.aria.forEach(el => { JA[el.dataset.i18nAria] = el.getAttribute("aria-label"); });
+  nodes.content.forEach(el => { JA[el.dataset.i18nContent] = el.getAttribute("content"); });
+  nodes.alt.forEach(el => { el.setAttribute("alt", JA[el.dataset.i18nAlt] = el.getAttribute("alt")); });
+  JA["title"] = "SuiCash";
+
+  function apply(lang){
+    const d = lang === "en" ? EN : JA;
+    const t = k => (k in d ? d[k] : JA[k]);
+    document.documentElement.lang = lang;
+    document.title = t("title");
+    nodes.html.forEach(el => { el.innerHTML = t(el.dataset.i18n); });
+    nodes.aria.forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+    nodes.content.forEach(el => { el.setAttribute("content", t(el.dataset.i18nContent)); });
+    nodes.alt.forEach(el => { el.setAttribute("alt", t(el.dataset.i18nAlt).replace(/<[^>]*>/g, "")); });
+    document.querySelector('meta[property="og:locale"]').content = lang === "en" ? "en_US" : "ja_JP";
+    document.querySelector('meta[property="og:locale:alternate"]').content = lang === "en" ? "ja_JP" : "en_US";
+    document.querySelectorAll(".lang button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  }
+
+  document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => {
+    const lang = b.dataset.lang;
+    try { localStorage.setItem("suicash-lang", lang); } catch (e) {}
+    const u = new URL(location.href);
+    u.searchParams.set("lang", lang);
+    history.replaceState(null, "", u);
+    apply(lang);
+  }));
+
+  apply(document.documentElement.lang === "en" ? "en" : "ja");
+})();
+</script>
+
+</body>
+</html>
