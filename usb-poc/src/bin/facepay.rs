@@ -23,6 +23,15 @@
 //!   FACEPAY_MERCHANT  店舗アドレス(決済の送金先。未設定だと決済不可)
 //!   FACEPAY_SUI_HELPER sui-pay.mjs のパス(既定は自動解決)
 //!   SUI_RPC           fullnode RPC(sui-pay.mjs へ引継)
+//!   SUICASH_GATE_PKG / SUICASH_GATE_OBJ
+//!                     オンチェーン ZK ゲート(felica_oracle パッケージと共有
+//!                     Gate オブジェクト)。sui-pay.mjs へ引継。未設定なら
+//!                     sui-pay.mjs 隣の gate.json が使われる
+//!
+//! 決済フロー: カードタップ時にオラクルが Groth16 証明を発行し、決済 PTB の
+//! 先頭で suicash_gate::verify がそれをオンチェーン検証する。検証に失敗すると
+//! 送金ごとアボートする(証明なしの決済経路はない)。証明は r1 に束縛され
+//! オンチェーンで burn されるため一度きり。次の決済は再タッチが必要。
 //!   FACEPAY_AUTOLAUNCH  端末オートローンチ(既定 1。0 で無効)
 //!   FACEPAY_UI_PORT     端末が読む UI 配信ポート(既定 5173)
 //!   FACEPAY_TERMINAL_URL   端末に開かせる URL(既定は UI_PORT/WS_PORT から生成)
@@ -62,6 +71,10 @@ struct Shared {
     pay_mode: Option<u64>,
     /// いま端末に出しているカードの IDi
     current_idi: Option<String>,
+    /// いま端末に出しているカードの attestation JSON(sui-pay.mjs へ渡す)。
+    /// オンチェーンの gate が r1 を burn するため一度きり: 決済開始時に
+    /// take され、次の決済にはカードの再タッチ(再 attest)が必要。
+    current_att: Option<String>,
     /// 接続中の全クライアント(端末 + 管理GUI)への送信口。全員に配信する。
     clients: Vec<(u64, Sender<String>)>,
     next_client_id: u64,
@@ -273,13 +286,18 @@ fn handle_report(text: &str, state: &State, cfg: &Arc<Config>) {
     eprintln!("端末→母艦: {t}");
     match t {
         "faceOk" => {
-            let (pay_mode, idi) = {
-                let s = state.lock().unwrap();
-                (s.pay_mode, s.current_idi.clone())
+            // attestation は take で取り出す(オンチェーンで r1 が burn される
+            // ため一度きり)。決済に入らないときは残しておく。
+            let job = {
+                let mut s = state.lock().unwrap();
+                match (s.pay_mode, s.current_idi.clone()) {
+                    (Some(amount), Some(idi)) => Some((amount, idi, s.current_att.take())),
+                    _ => None,
+                }
             };
-            if let (Some(amount), Some(idi)) = (pay_mode, idi) {
+            if let Some((amount, idi, att)) = job {
                 let (state, cfg) = (state.clone(), cfg.clone());
-                thread::spawn(move || run_payment(&state, &cfg, &idi, amount));
+                thread::spawn(move || run_payment(&state, &cfg, &idi, amount, att));
             }
         }
         // 管理GUI からの操作コマンド {"type":"op","cmd":"pay"|"idle"|"status","amount":<MIST>}
@@ -312,12 +330,22 @@ fn set_pay_mode(state: &State, mist: Option<u64>) {
     broadcast_status(state);
 }
 
-/// 決済(送金)を実行し paymentResult を端末へ返す
-fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
+/// 決済(送金)を実行し paymentResult を端末へ返す。
+///
+/// 送金 PTB の先頭で attestation の Groth16 証明をオンチェーン検証する
+/// (felica_oracle::suicash_gate::verify)。証明が通らなければ送金ごと
+/// アボートするので、ZK 検証を通らない決済経路は存在しない。
+fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64, att: Option<String>) {
     if cfg.merchant.is_empty() {
         emit_payment(state, r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"店舗アドレス未設定"}"#.to_string());
         return;
     }
+    let Some(att) = att else {
+        emit_payment(state, format!(
+            r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"0","error":"認証情報がありません。カードを再タッチしてください"}}"#
+        ));
+        return;
+    };
     // 送金前に残高を確認。足りなければ日本語で「残高がありません」
     let bal = sui_helper(cfg, &["balance", idi]);
     let balance: u128 = bal
@@ -335,7 +363,11 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
         return;
     }
 
-    let res = sui_helper(cfg, &["pay", idi, &amount.to_string(), &cfg.merchant]);
+    let res = sui_helper_env(
+        cfg,
+        &["pay", idi, &amount.to_string(), &cfg.merchant],
+        &[("SUICASH_ATTESTATION", &att)],
+    );
     let ok = res.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
     let msg = if ok {
         let after = res.get("balanceAfter").and_then(|x| x.as_str()).unwrap_or("0");
@@ -368,7 +400,18 @@ fn emit_payment(state: &State, json: String) {
 // ------------------------------------------------------------- sui-pay.mjs 呼出
 
 fn sui_helper(cfg: &Config, args: &[&str]) -> serde_json::Value {
-    match Command::new("node").arg(&cfg.sui_helper).args(args).output() {
+    sui_helper_env(cfg, args, &[])
+}
+
+/// 追加の環境変数つきで sui-pay.mjs を呼ぶ。attestation は引数だと ps に
+/// 露出し長さ制限も踏むので、環境変数で渡す。
+fn sui_helper_env(cfg: &Config, args: &[&str], envs: &[(&str, &str)]) -> serde_json::Value {
+    let mut cmd = Command::new("node");
+    cmd.arg(&cfg.sui_helper).args(args);
+    for (k, v) in envs {
+        cmd.env(k, v);
+    }
+    match cmd.output() {
         Ok(o) => {
             let s = String::from_utf8_lossy(&o.stdout);
             serde_json::from_str(s.trim().lines().last().unwrap_or("{}"))
@@ -505,9 +548,9 @@ fn card_loop(state: State, cfg: Arc<Config>) {
                 // タップを検出した瞬間に「認証中」を即通知(オラクル認証は数秒かかる)
                 send_terminal(&state, r#"{"type":"detecting"}"#.to_string());
                 match attest_with_card(&mut card, &oracle) {
-                    Ok(idi) => {
+                    Ok((idi, att_json)) => {
                         last_idm = idm;
-                        on_card(&state, &cfg, &idi);
+                        on_card(&state, &cfg, &idi, att_json);
                     }
                     Err(e) => {
                         eprintln!("認証失敗: {e:#}");
@@ -527,6 +570,7 @@ fn card_loop(state: State, cfg: Arc<Config>) {
                     {
                         let mut s = state.lock().unwrap();
                         s.current_idi = None;
+                        s.current_att = None;
                         s.last_card_json = None;
                     }
                     send_terminal(&state, r#"{"type":"cardRemoved"}"#.to_string());
@@ -537,8 +581,9 @@ fn card_loop(state: State, cfg: Arc<Config>) {
     }
 }
 
-/// ポーリング済みカードに対し challenge→Auth1→settle→Auth2→attest を行い IDi を得る
-fn attest_with_card(card: &mut Card, oracle: &Oracle) -> anyhow::Result<String> {
+/// ポーリング済みカードに対し challenge→Auth1→settle→Auth2→attest を行い、
+/// IDi と、オンチェーン ZK 検証に必要な attestation JSON を得る
+fn attest_with_card(card: &mut Card, oracle: &Oracle) -> anyhow::Result<(String, String)> {
     let idm = card.idm;
     let mut r1: Block = [0u8; 8];
     rand::thread_rng().fill_bytes(&mut r1);
@@ -557,12 +602,41 @@ fn attest_with_card(card: &mut Card, oracle: &Oracle) -> anyhow::Result<String> 
         .ok_or_else(|| anyhow::anyhow!("bad c2b"))?;
     let auth2 = card.authentication2(&c2b, AUTH2_TIMEOUT)?;
     let attest = oracle.attest(&hex::encode(idm), &hex::encode(c1b), &hex::encode(c2a), &hex::encode(&auth2))?;
-    Ok(attest.idi.to_lowercase())
+    let att_json = attestation_json(&attest, &r1)?;
+    Ok((attest.idi.to_lowercase(), att_json))
+}
+
+/// オラクルの座標形式 Groth16 証明を `sui::groth16` が受ける Arkworks 圧縮
+/// バイト列へ変換し、sui-pay.mjs へ渡す attestation JSON を組み立てる。
+///
+/// r1 はこのプロセスの CSPRNG が選んだ値で、証明はそれに束縛されている。
+/// オンチェーンの gate が同じ r1 を要求して burn するので、この JSON は
+/// 一度しか使えない。
+fn attestation_json(att: &usb_poc::oracle::AttestResult, r1: &Block) -> anyhow::Result<String> {
+    let wire = prover::Groth16Proof {
+        alg: att.proof.alg.clone(),
+        a: att.proof.a.clone(),
+        b: att.proof.b.clone(),
+        c: att.proof.c.clone(),
+        public_inputs: att.proof.public_inputs.clone(),
+    };
+    let proof = prover::proof_compressed_bytes(&wire)
+        .map_err(|e| anyhow::anyhow!("proof の圧縮変換に失敗: {e}"))?;
+    let pis = prover::public_inputs_bytes(&wire)
+        .map_err(|e| anyhow::anyhow!("public inputs の変換に失敗: {e}"))?;
+    Ok(serde_json::json!({
+        "idi": att.idi.to_lowercase(),
+        "attested_at": att.attested_at,
+        "r1": hex::encode(r1),
+        "proof": hex::encode(proof),
+        "public_inputs": hex::encode(pis),
+    })
+    .to_string())
 }
 
 /// カード確定時: 残高照会・登録判定して card イベントを端末へ
-fn on_card(state: &State, cfg: &Arc<Config>, idi: &str) {
-    eprintln!("カード: IDi={idi}");
+fn on_card(state: &State, cfg: &Arc<Config>, idi: &str, att_json: String) {
+    eprintln!("カード: IDi={idi}(ZK attestation 取得済み)");
     let bal = sui_helper(cfg, &["balance", idi]);
     let balance = bal.get("balance").and_then(|x| x.as_str()).unwrap_or("0").to_string();
     // オンチェーン登録の判定は残高 > 0(regist-web でチャージ済み=登録済み)を代用
@@ -571,6 +645,7 @@ fn on_card(state: &State, cfg: &Arc<Config>, idi: &str) {
     {
         let mut s = state.lock().unwrap();
         s.current_idi = Some(idi.to_string());
+        s.current_att = Some(att_json);
         s.last_card_json = Some(json.clone());
     }
     send_terminal(state, json);
