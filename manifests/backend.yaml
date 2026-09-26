@@ -57,19 +57,6 @@ spec:
                   key: proving-key-path
             - name: RUST_LOG
               value: info
-          # Measured 2026-09-25 (release, this host):
-          # idle RSS ~5.7MB/33 threads; ping ~6ms; challenge ~0.2ms;
-          # single prove 1.8-3.0s test-time, peak RSS 387-494MB,
-          # 750-990% CPU (rayon). Suite of 13 proves peaked 1.19GB.
-          # requests = schedule-safe baseline; limits = 1 concurrent
-          # prove + headroom (2 concurrent ~1GB). Follows
-          # larkmcp/quarkus 256Mi/250m-512Mi/500m baseline, raised for ZK.
-          resources:
-            requests:
-              memory: "512Mi"
-              cpu: "500m"
-            limits:
-              cpu: "2000m"
           # No GET /health in jsonrpsee (POST / only, GET -> 405), so
           # tcpSocket probes. Proving-key file load happens at startup
           # before listen; startupProbe covers it.
