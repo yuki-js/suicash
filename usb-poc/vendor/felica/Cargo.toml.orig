@@ -1,0 +1,70 @@
+[package]
+name = "felica"
+version = "1.0.3"
+edition = "2024"
+rust-version = "1.88"
+description = "FeliCa protocol implementation: mutual authentication, card emulation and PaSoRi reader drivers"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/soltia48/felica-rs"
+keywords = ["felica", "nfc", "smartcard", "pasori", "rfid"]
+categories = ["hardware-support", "cryptography", "embedded"]
+# Editor settings are not part of the crate.
+exclude = [".github/", ".vscode/"]
+
+# Several modules exist only with the `usb` feature, and the crate docs link to
+# them.  Document with everything on, which is also what docs.rs should show.
+[package.metadata.docs.rs]
+all-features = true
+
+[dependencies]
+aes = { version = "0.9", features = ["zeroize"] }
+cbc = { version = "0.2", features = ["zeroize"] }
+cmac = { version = "0.8", features = ["zeroize"] }
+des = { version = "0.9", features = ["zeroize"] }
+env_logger = "0.11"
+hex = "0.4"
+log = "0.4"
+ofb = { version = "0.7", features = ["zeroize"] }
+rand = "0.10"
+rusb = { version = "0.9", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+smallvec = "1.15"
+subtle = "2"
+thiserror = "2.0"
+zeroize = { version = "1.9.0", features = ["zeroize_derive"] }
+
+[features]
+# `usb` pulls in the `rusb`-backed USB transport, the concrete PaSoRi drivers
+# (Port-100/400, RC-S320/S956) and the high-level `reader` facade. It is on by
+# default for backward compatibility. Turn it off (`default-features = false`)
+# to build only the hardware-independent parts — the `felica_standard` protocol
+# (crypto, mutual authentication, card emulator, `FelicaDriver` trait) and the
+# TCP `driver::remote` — with no `rusb`/`libusb` dependency. That is how a server
+# that drives authentication over a relay (rather than a local reader) consumes
+# this crate.
+default = ["usb"]
+usb = ["dep:rusb"]
+
+[dev-dependencies]
+encoding_rs = "0.8"
+
+# All but `remote_client` drive a local reader, so they need the `usb` feature.
+# Without this, `cargo build --no-default-features` fails on the examples even
+# though the library itself builds fine.
+[[example]]
+name = "dump"
+required-features = ["usb"]
+
+[[example]]
+name = "dump_suica"
+required-features = ["usb"]
+
+[[example]]
+name = "emulate"
+required-features = ["usb"]
+
+[[example]]
+name = "remote_server"
+required-features = ["usb"]
