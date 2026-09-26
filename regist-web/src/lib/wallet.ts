@@ -1,6 +1,7 @@
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { getFaucetHost, requestSuiFromFaucetV2 } from "@mysten/sui/faucet";
+import { Transaction } from "@mysten/sui/transactions";
 
 /**
  * Sui ウォレット(IDi シードの Account Abstraction ウォレット)。
@@ -46,7 +47,22 @@ function setting(key: string, envKey: string, fallback: string): string {
 const RPC_URL = setting("rpc", "VITE_SUI_RPC", getFullnodeUrl(NETWORK));
 const FAUCET_URL = setting("faucet", "VITE_SUI_FAUCET", getFaucetHost(NETWORK));
 
+/**
+ * トレジャリー秘密鍵(任意)。設定されていれば faucet を使わず、この
+ * 事前入金済みアカウントから送金する(公開 faucet の 429 を完全回避)。
+ * 形式は `suiprivkey1...`(sui keytool の bech32)。testnet 専用・デモ用途。
+ * 値はリポジトリに入れず、実行時に URL/localStorage/env で注入する。
+ */
+const TREASURY_SECRET = setting("treasury", "VITE_TREASURY_SECRET", "");
+
+/** 1 回のチャージ額(MIST)。既定 0.2 SUI */
+const CHARGE_MIST = 200_000_000n;
+
 export const client = new SuiClient({ url: RPC_URL });
+
+export function hasTreasury(): boolean {
+  return TREASURY_SECRET.trim().length > 0;
+}
 
 /** IDi(16 hex 文字)→ 32 バイトのシード(SHA-256(domain || idiBytes)) */
 async function seedFromIdi(idiHex: string): Promise<Uint8Array> {
@@ -105,10 +121,14 @@ export interface ChargeResult {
 }
 
 /**
- * testnet faucet からチャージ。
- * 公開 faucet はレート制限(429)が出やすいので、理由とクールダウンを返す。
+ * チャージ。
+ * トレジャリー鍵が設定されていればそこから送金(faucet を使わず 429 回避)。
+ * 未設定なら公開 testnet faucet にフォールバック(429 が出やすい)。
  */
 export async function requestCharge(address: string): Promise<ChargeResult> {
+  if (hasTreasury()) {
+    return chargeFromTreasury(address);
+  }
   try {
     await requestSuiFromFaucetV2({ host: FAUCET_URL, recipient: address });
     return { ok: true, message: "チャージしました(testnet faucet)" };
@@ -118,12 +138,48 @@ export async function requestCharge(address: string): Promise<ChargeResult> {
       return {
         ok: false,
         message:
-          "faucet が混雑しています(レート制限)。時間をおくか、同じアドレスは一定時間あけて再度お試しください。",
+          "faucet が混雑しています(レート制限)。トレジャリー鍵を設定すると 429 を回避できます(README 参照)。",
         retryAfterSec: 60,
       };
     }
     const detail = e instanceof Error ? e.message : String(e);
     return { ok: false, message: `チャージに失敗しました: ${detail}` };
+  }
+}
+
+/** トレジャリー(事前入金済みアカウント)から CHARGE_MIST を送金する */
+async function chargeFromTreasury(address: string): Promise<ChargeResult> {
+  try {
+    const treasury = Ed25519Keypair.fromSecretKey(TREASURY_SECRET.trim());
+    const tx = new Transaction();
+    const [coin] = tx.splitCoins(tx.gas, [CHARGE_MIST]);
+    tx.transferObjects([coin], address);
+    const res = await client.signAndExecuteTransaction({
+      signer: treasury,
+      transaction: tx,
+      options: { showEffects: true },
+    });
+    const status = res.effects?.status?.status;
+    if (status !== "success") {
+      return { ok: false, message: `送金が失敗しました: ${res.effects?.status?.error ?? status}` };
+    }
+    return { ok: true, message: `チャージしました(${Number(CHARGE_MIST) / 1e9} SUI)` };
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    if (/insufficient|gas|balance/i.test(detail)) {
+      return { ok: false, message: "トレジャリーの残高が不足しています。testnet SUI を補充してください。" };
+    }
+    return { ok: false, message: `チャージに失敗しました: ${detail}` };
+  }
+}
+
+/** トレジャリーのアドレス(補充用に表示)。未設定なら null */
+export function treasuryAddress(): string | null {
+  if (!hasTreasury()) return null;
+  try {
+    return Ed25519Keypair.fromSecretKey(TREASURY_SECRET.trim()).getPublicKey().toSuiAddress();
+  } catch {
+    return null;
   }
 }
 

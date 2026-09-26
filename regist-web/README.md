@@ -81,6 +81,31 @@ localStorage > ビルド時 env > 既定):
 429 が出たときは UI 側でクールダウン(再試行まで N 秒)を表示する。faucet は
 同一アドレス・同一 IP への連続要求を制限するので、少し間隔をあけて試すこと。
 
+### 429 を根本回避:トレジャリー送金(推奨)
+
+公開 faucet の 429 を完全に避けるには、**事前入金済みの testnet アカウント
+(トレジャリー)から送金**する。faucet を一切叩かないので 429 は出ない。
+
+1. トレジャリー鍵を作って testnet SUI を入れる:
+   ```sh
+   sui client new-address ed25519           # suiprivkey1... を控える
+   sui client switch --address <その address>
+   sui client faucet                         # 何度か。デモ人数ぶん貯める
+   sui keytool export --key-identity <address>   # suiprivkey1... を取得
+   ```
+2. その `suiprivkey1...` を実行時に注入(**リポジトリには入れない**):
+
+   | 方法 | 指定 |
+   | --- | --- |
+   | URL クエリ | `?treasury=suiprivkey1...`(一度で localStorage に保存) |
+   | ビルド時 env | `VITE_TREASURY_SECRET=suiprivkey1...` |
+
+3. 設定されていれば「チャージ」は自動でトレジャリー送金(1 回 0.2 SUI)に切り替わる。
+   未設定なら従来どおり faucet にフォールバック。
+
+> testnet 専用・デモ用途。鍵はブラウザに載る(静的サイトのため)ので、
+> 価値のある鍵は使わないこと。残高が尽きたら `sui client faucet` で補充。
+
 ## プライバシー設計
 
 - **IDi(カード番号)は外部へ送らない**。外部(チェーン・IDi 検証サーバー)に
