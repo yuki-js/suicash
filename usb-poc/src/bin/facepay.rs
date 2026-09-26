@@ -13,12 +13,21 @@
 //! 母艦→端末: card / mode / paymentResult / cardRemoved
 //! 端末→母艦: faceOk / faceNg / enrolled / cancel
 //!
+//! 起動すると全機能(FeliCa読取・オラクル認証・WS配信・決済)が有効化され、
+//! さらに adb 経由で Hi-CARA 端末クライアント(WebView)を自動起動する。
+//! GUI 版(facepay-admin)はこのデーモンを子プロセスとして起動する。
+//!
 //! 環境変数:
 //!   FACEPAY_ORACLE    オラクル URL(既定 https://felica-oracle.serken.tech)
 //!   FACEPAY_WS_PORT   WebSocket ポート(既定 8899)
 //!   FACEPAY_MERCHANT  店舗アドレス(決済の送金先。未設定だと決済不可)
-//!   FACEPAY_SUI_HELPER sui-pay.mjs のパス(既定 facepay/sui-pay.mjs)
+//!   FACEPAY_SUI_HELPER sui-pay.mjs のパス(既定は自動解決)
 //!   SUI_RPC           fullnode RPC(sui-pay.mjs へ引継)
+//!   FACEPAY_AUTOLAUNCH  端末オートローンチ(既定 1。0 で無効)
+//!   FACEPAY_UI_PORT     端末が読む UI 配信ポート(既定 5173)
+//!   FACEPAY_TERMINAL_URL   端末に開かせる URL(既定は UI_PORT/WS_PORT から生成)
+//!   FACEPAY_TERMINAL_COMPONENT  端末アプリの起動コンポーネント
+//!   ADB               adb バイナリのパス(既定 adb)
 
 use std::io::BufRead;
 use std::process::Command;
@@ -53,11 +62,14 @@ struct Shared {
     pay_mode: Option<u64>,
     /// いま端末に出しているカードの IDi
     current_idi: Option<String>,
-    /// 端末への送信口(WS 接続中のみ Some)
-    term_tx: Option<Sender<String>>,
-    /// 直近の card イベント JSON。WS 接続時に再送し、カードが載ったまま
+    /// 接続中の全クライアント(端末 + 管理GUI)への送信口。全員に配信する。
+    clients: Vec<(u64, Sender<String>)>,
+    next_client_id: u64,
+    /// 直近の card イベント JSON。接続時に再送し、カードが載ったまま
     /// 端末が起動/リロードしても反応するようにする。
     last_card_json: Option<String>,
+    /// 直近の決済結果 JSON(管理GUI 表示用)
+    last_payment_json: Option<String>,
 }
 type State = Arc<Mutex<Shared>>;
 
@@ -65,25 +77,59 @@ fn env(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
 
+/// sui-pay.mjs の場所を cwd に依存せず解決する。
+/// 環境変数優先。なければ cwd / リポジトリ配置 / 実行ファイル相対で探す。
+fn resolve_helper() -> String {
+    if let Ok(p) = std::env::var("FACEPAY_SUI_HELPER") {
+        return p;
+    }
+    let mut candidates: Vec<std::path::PathBuf> = vec![
+        "facepay/sui-pay.mjs".into(),
+        "usb-poc/facepay/sui-pay.mjs".into(),
+    ];
+    // 実行ファイル(usb-poc/target/debug/facepay)から見た ../../facepay/sui-pay.mjs
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            candidates.push(dir.join("../../facepay/sui-pay.mjs"));
+            candidates.push(dir.join("../../../usb-poc/facepay/sui-pay.mjs"));
+        }
+    }
+    for c in &candidates {
+        if c.exists() {
+            return c.to_string_lossy().into_owned();
+        }
+    }
+    "facepay/sui-pay.mjs".to_string()
+}
+
 fn main() {
     let cfg = Arc::new(Config {
         oracle: env("FACEPAY_ORACLE", "https://felica-oracle.serken.tech"),
         ws_port: env("FACEPAY_WS_PORT", "8899").parse().unwrap_or(8899),
         merchant: env("FACEPAY_MERCHANT", ""),
-        sui_helper: env("FACEPAY_SUI_HELPER", "facepay/sui-pay.mjs"),
+        sui_helper: resolve_helper(),
     });
     let state: State = Arc::new(Mutex::new(Shared::default()));
 
     eprintln!(
-        "facepay: oracle={} ws=:{} merchant={}",
+        "facepay: oracle={} ws=:{} merchant={} helper={}",
         cfg.oracle,
         cfg.ws_port,
-        if cfg.merchant.is_empty() { "(未設定: 決済不可)" } else { &cfg.merchant }
+        if cfg.merchant.is_empty() { "(未設定: 決済不可)" } else { &cfg.merchant },
+        cfg.sui_helper,
     );
 
     {
         let (state, cfg) = (state.clone(), cfg.clone());
         thread::spawn(move || ws_server(state, cfg));
+    }
+    // 端末オートローンチ(adb reverse + am start)。WS 待受が立ってから。
+    if env("FACEPAY_AUTOLAUNCH", "1") != "0" {
+        let cfg = cfg.clone();
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(700));
+            launch_terminal(&cfg);
+        });
     }
     {
         let (state, cfg) = (state.clone(), cfg.clone());
@@ -94,10 +140,14 @@ fn main() {
 
 // ----------------------------------------------------------------- 端末へ送信
 
+/// 接続中の全クライアント(端末・管理GUI)へ配信
 fn send_terminal(state: &State, json: String) {
-    let tx = { state.lock().unwrap().term_tx.clone() };
-    if let Some(tx) = tx {
-        let _ = tx.send(json);
+    let txs: Vec<Sender<String>> = {
+        let s = state.lock().unwrap();
+        s.clients.iter().map(|(_, tx)| tx.clone()).collect()
+    };
+    for tx in txs {
+        let _ = tx.send(json.clone());
     }
 }
 
@@ -106,6 +156,28 @@ fn mode_json(pay_mode: Option<u64>) -> String {
         Some(a) => format!(r#"{{"type":"mode","payment":{{"amount":"{a}"}}}}"#),
         None => r#"{"type":"mode","payment":null}"#.to_string(),
     }
+}
+
+/// 管理GUI 向けの状態イベント
+fn status_json(s: &Shared) -> String {
+    let mode = match s.pay_mode {
+        Some(a) => format!(r#""payment","amount":"{a}""#),
+        None => r#""idle","amount":null"#.to_string(),
+    };
+    let idi = s
+        .current_idi
+        .as_deref()
+        .map(|x| format!("\"{x}\""))
+        .unwrap_or_else(|| "null".to_string());
+    format!(
+        r#"{{"type":"status","mode":{mode},"idi":{idi},"clients":{}}}"#,
+        s.clients.len()
+    )
+}
+
+fn broadcast_status(state: &State) {
+    let json = { status_json(&state.lock().unwrap()) };
+    send_terminal(state, json);
 }
 
 // ------------------------------------------------------------- WebSocket サーバ
@@ -137,38 +209,58 @@ fn ws_handle(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut ws = tungstenite::accept(stream)?;
     ws.get_ref().set_read_timeout(Some(Duration::from_millis(100)))?;
-    eprintln!("端末が接続しました");
+    eprintln!("クライアント接続");
 
     let (tx, rx) = channel::<String>();
+    let id;
     {
         let mut s = state.lock().unwrap();
-        s.term_tx = Some(tx);
+        id = s.next_client_id;
+        s.next_client_id += 1;
+        s.clients.push((id, tx));
         let mode = mode_json(s.pay_mode);
         let card = s.last_card_json.clone();
+        let payment = s.last_payment_json.clone();
+        let status = status_json(&s);
         drop(s);
         let _ = ws.send(tungstenite::Message::Text(mode));
+        let _ = ws.send(tungstenite::Message::Text(status));
         // カードが既に載っているなら接続直後に再通知
         if let Some(card) = card {
             let _ = ws.send(tungstenite::Message::Text(card));
         }
+        if let Some(payment) = payment {
+            let _ = ws.send(tungstenite::Message::Text(payment));
+        }
     }
+    // 接続数が変わったので他クライアントにも status を配信
+    broadcast_status(&state);
 
-    loop {
-        while let Ok(msg) = rx.try_recv() {
-            ws.send(tungstenite::Message::Text(msg))?;
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        loop {
+            while let Ok(msg) = rx.try_recv() {
+                ws.send(tungstenite::Message::Text(msg))?;
+            }
+            match ws.read() {
+                Ok(tungstenite::Message::Text(t)) => handle_report(&t, &state, &cfg),
+                Ok(tungstenite::Message::Close(_)) => break,
+                Ok(_) => {}
+                Err(tungstenite::Error::Io(ref e))
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(e) => return Err(e.into()),
+            }
         }
-        match ws.read() {
-            Ok(tungstenite::Message::Text(t)) => handle_report(&t, &state, &cfg),
-            Ok(tungstenite::Message::Close(_)) => break,
-            Ok(_) => {}
-            Err(tungstenite::Error::Io(ref e))
-                if e.kind() == std::io::ErrorKind::WouldBlock
-                    || e.kind() == std::io::ErrorKind::TimedOut => {}
-            Err(e) => return Err(e.into()),
-        }
+        Ok(())
+    })();
+
+    // 切断: このクライアントを外す
+    {
+        let mut s = state.lock().unwrap();
+        s.clients.retain(|(cid, _)| *cid != id);
     }
-    state.lock().unwrap().term_tx = None;
-    Ok(())
+    broadcast_status(&state);
+    result
 }
 
 /// 端末からのレポート処理(faceOk で決済モードなら送金)
@@ -179,24 +271,70 @@ fn handle_report(text: &str, state: &State, cfg: &Arc<Config>) {
     };
     let t = v.get("type").and_then(|x| x.as_str()).unwrap_or("");
     eprintln!("端末→母艦: {t}");
-    if t == "faceOk" {
-        let (pay_mode, idi) = {
-            let s = state.lock().unwrap();
-            (s.pay_mode, s.current_idi.clone())
-        };
-        if let (Some(amount), Some(idi)) = (pay_mode, idi) {
-            let (state, cfg) = (state.clone(), cfg.clone());
-            thread::spawn(move || run_payment(&state, &cfg, &idi, amount));
+    match t {
+        "faceOk" => {
+            let (pay_mode, idi) = {
+                let s = state.lock().unwrap();
+                (s.pay_mode, s.current_idi.clone())
+            };
+            if let (Some(amount), Some(idi)) = (pay_mode, idi) {
+                let (state, cfg) = (state.clone(), cfg.clone());
+                thread::spawn(move || run_payment(&state, &cfg, &idi, amount));
+            }
         }
+        // 管理GUI からの操作コマンド {"type":"op","cmd":"pay"|"idle"|"status","amount":<MIST>}
+        "op" => {
+            let cmd = v.get("cmd").and_then(|x| x.as_str()).unwrap_or("");
+            match cmd {
+                "pay" => {
+                    // amount は MIST(数値) か SUI(文字列 sui) を許容
+                    let mist = v
+                        .get("amount")
+                        .and_then(|x| x.as_u64())
+                        .or_else(|| v.get("sui").and_then(|x| x.as_f64()).map(|s| (s * 1e9).round() as u64));
+                    if let Some(mist) = mist {
+                        set_pay_mode(state, Some(mist));
+                    }
+                }
+                "idle" => set_pay_mode(state, None),
+                "status" => broadcast_status(state),
+                _ => {}
+            }
+        }
+        _ => {}
     }
+}
+
+/// 決済待機額を設定して端末・GUI に mode と status を配信
+fn set_pay_mode(state: &State, mist: Option<u64>) {
+    state.lock().unwrap().pay_mode = mist;
+    send_terminal(state, mode_json(mist));
+    broadcast_status(state);
 }
 
 /// 決済(送金)を実行し paymentResult を端末へ返す
 fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
     if cfg.merchant.is_empty() {
-        send_terminal(state, r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"店舗アドレス未設定"}"#.to_string());
+        emit_payment(state, r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"店舗アドレス未設定"}"#.to_string());
         return;
     }
+    // 送金前に残高を確認。足りなければ日本語で「残高がありません」
+    let bal = sui_helper(cfg, &["balance", idi]);
+    let balance: u128 = bal
+        .get("balance")
+        .and_then(|x| x.as_str())
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    if balance < amount as u128 {
+        emit_payment(
+            state,
+            format!(
+                r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"{balance}","error":"残高がありません"}}"#
+            ),
+        );
+        return;
+    }
+
     let res = sui_helper(cfg, &["pay", idi, &amount.to_string(), &cfg.merchant]);
     let ok = res.get("ok").and_then(|x| x.as_bool()).unwrap_or(false);
     let msg = if ok {
@@ -204,13 +342,27 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
         let digest = res.get("digest").and_then(|x| x.as_str()).unwrap_or("");
         format!(r#"{{"type":"paymentResult","ok":true,"amount":"{amount}","balanceAfter":"{after}","digest":"{digest}"}}"#)
     } else {
-        let err = res.get("error").and_then(|x| x.as_str()).unwrap_or("送金失敗");
+        // 送金失敗はすべて日本語に。ガス/残高不足は「残高がありません」
+        let raw = res.get("error").and_then(|x| x.as_str()).unwrap_or("");
+        let jp = if raw.to_lowercase().contains("insufficient")
+            || raw.to_lowercase().contains("gas")
+            || raw.to_lowercase().contains("balance")
+        {
+            "残高がありません"
+        } else {
+            "決済に失敗しました"
+        };
         format!(
-            r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"0","error":{}}}"#,
-            serde_json::to_string(err).unwrap()
+            r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"{balance}","error":"{jp}"}}"#
         )
     };
-    send_terminal(state, msg);
+    emit_payment(state, msg);
+}
+
+/// 決済結果を配信し、管理GUI 再表示用に保持する
+fn emit_payment(state: &State, json: String) {
+    state.lock().unwrap().last_payment_json = Some(json.clone());
+    send_terminal(state, json);
 }
 
 // ------------------------------------------------------------- sui-pay.mjs 呼出
@@ -226,6 +378,62 @@ fn sui_helper(cfg: &Config, args: &[&str]) -> serde_json::Value {
     }
 }
 
+// ----------------------------------------------------- 端末(Hi-CARA)オートローンチ
+
+/// adb 経由で端末クライアントを自動起動する(ベストエフォート)。
+/// 失敗しても警告だけ出してデーモン本体は継続する。
+fn launch_terminal(cfg: &Config) {
+    let adb = env("ADB", "adb");
+    let ui_port: u16 = env("FACEPAY_UI_PORT", "5173").parse().unwrap_or(5173);
+    let component = env(
+        "FACEPAY_TERMINAL_COMPONENT",
+        "jp.serkenn.hicara.suicashui/.MainActivity",
+    );
+    // 端末の localhost:{ws_port} を母艦へ橋渡し(WS)。UI 配信も同様に橋渡し。
+    let ws_arg = format!("tcp:{}", cfg.ws_port);
+    let ui_arg = format!("tcp:{ui_port}");
+    // 端末が開く URL。?ws= は URL エンコードして渡す(terminal.ts が復号する)。
+    let default_url = format!(
+        "http://localhost:{ui_port}/?ws=ws%3A%2F%2Flocalhost%3A{}",
+        cfg.ws_port
+    );
+    let url = env("FACEPAY_TERMINAL_URL", &default_url);
+
+    // 端末が接続されているか確認
+    let devices = Command::new(&adb).arg("devices").output();
+    match &devices {
+        Ok(o) if String::from_utf8_lossy(&o.stdout).lines().skip(1).any(|l| l.contains("device")) => {}
+        Ok(_) => {
+            eprintln!("端末オートローンチ: adb デバイス未検出(手動接続時は adb 後に再起動)");
+            return;
+        }
+        Err(e) => {
+            eprintln!("端末オートローンチ: adb 実行不可({e}) — スキップ");
+            return;
+        }
+    }
+
+    let steps: [(&str, Vec<&str>); 3] = [
+        ("reverse WS", vec!["reverse", &ws_arg, &ws_arg]),
+        ("reverse UI", vec!["reverse", &ui_arg, &ui_arg]),
+        (
+            "am start",
+            vec!["shell", "am", "start", "-n", &component, "-d", &url],
+        ),
+    ];
+    for (label, args) in steps {
+        match Command::new(&adb).args(&args).output() {
+            Ok(o) if o.status.success() => eprintln!("端末オートローンチ: {label} OK"),
+            Ok(o) => eprintln!(
+                "端末オートローンチ: {label} 失敗 {}",
+                String::from_utf8_lossy(&o.stderr).trim()
+            ),
+            Err(e) => eprintln!("端末オートローンチ: {label} 実行不可({e})"),
+        }
+    }
+    eprintln!("端末オートローンチ: 完了({url})");
+}
+
 // ------------------------------------------------------------------- CLI
 
 fn cli_loop(state: State, cfg: Arc<Config>) {
@@ -236,28 +444,26 @@ fn cli_loop(state: State, cfg: Arc<Config>) {
             Some("pay") => {
                 if let Some(sui) = it.next().and_then(|x| x.parse::<f64>().ok()) {
                     let mist = (sui * 1e9).round() as u64;
-                    state.lock().unwrap().pay_mode = Some(mist);
-                    send_terminal(&state, mode_json(Some(mist)));
+                    set_pay_mode(&state, Some(mist));
                     println!("→ 決済待機 {sui} SUI ({mist} MIST)");
                 } else {
                     println!("使い方: pay <SUI>  例) pay 0.3");
                 }
             }
             Some("idle") => {
-                state.lock().unwrap().pay_mode = None;
-                send_terminal(&state, mode_json(None));
+                set_pay_mode(&state, None);
                 println!("→ 残高照会モード");
             }
             Some("status") => {
                 let s = state.lock().unwrap();
                 println!(
-                    "mode={} card={} terminal={} (helper={})",
+                    "mode={} card={} clients={} (helper={})",
                     match s.pay_mode {
                         Some(m) => format!("決済 {m} MIST"),
                         None => "残高照会".into(),
                     },
                     s.current_idi.clone().unwrap_or_else(|| "(なし)".into()),
-                    if s.term_tx.is_some() { "接続中" } else { "未接続" },
+                    s.clients.len(),
                     cfg.sui_helper,
                 );
             }
