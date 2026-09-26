@@ -22,9 +22,22 @@ hex = "0.4"
 anyhow = "1"
 rand = "0.8"
 
+# 決済端末デーモン(facepay)の端末連携用 WebSocket サーバ。
+tungstenite = "0.24"
+
+[lib]
+name = "usb_poc"
+path = "src/lib.rs"
+
 [[bin]]
 name = "usb-poc"
 path = "src/main.rs"
+
+# 決済端末の母艦デーモン: FeliCa 読取(card)+ オラクル認証(oracle)+
+# WebSocket 端末連携 + オンチェーン決済(sui-pay.mjs)+ オペレータ CLI。
+[[bin]]
+name = "facepay"
+path = "src/bin/facepay.rs"
 
 # The RC-S634/UA (054c:06c2) is the embedded-module variant of the RC-S380 and
 # speaks the same Port-100 protocol, but upstream felica 1.0.3 only lists

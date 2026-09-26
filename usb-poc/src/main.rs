@@ -33,15 +33,12 @@
 //! Note that steps 1–3 are *not* subject to that gap: they are checks the
 //! physical card performs. A forgery cannot make a real Suica accept a C1A.
 
-mod card;
-mod oracle;
-
 use anyhow::{bail, Context, Result};
-use card::{Block, Card};
 use felica::felica_standard::ServiceCode;
 use felica::ReaderPreference;
-use oracle::Oracle;
 use std::process::ExitCode;
+use usb_poc::card::{Block, Card};
+use usb_poc::oracle::Oracle;
 
 /// The Suica service codes worth reporting key versions for, from the node
 /// table in `soltia48/suica-viewer`. Probing these is key-free and shows which
