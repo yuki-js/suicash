@@ -1,8 +1,8 @@
 # SuiCash カード券面
 
 `suicash-card.svg` — SuiCash プリペイドカードの券面(交通系 IC カード風の
-オリジナルデザイン)。地はシルバー、下部にテーマカラー(アクア #4DA2FF 系)の
-多角形の山、IC チップ、ワードマーク、マスコットを配置。viewBox は 172×108。
+オリジナルデザイン)。地はシルバー、左にテーマカラー(アクア #4DA2FF 系)の
+台形パネル、その左下にワードマーク、右にマスコットを配置。viewBox は 172×108。
 
 - `face-auth-ui/src/components/SuiCashCard.tsx` のインライン SVG を単独ファイル化したもの。
 - ワードマークは [`../logo/suicash-logo.svg`](../logo/suicash-logo.svg) と同じ REM 605 の組み方。
