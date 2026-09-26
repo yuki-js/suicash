@@ -367,15 +367,17 @@ fn run(args: &Args) -> Result<Outcome> {
     // The interesting one: the proof is bound to *our* challenge, so it cannot
     // be replayed against a different session.
     ok &= check("proof is bound to this session's R1", pi_r1 == r1);
+    // attested_at が現在時刻から ±1 日以内か(オラクルの時計のドリフト信号)。
+    // epoch 秒なのでタイムゾーンには依存しない。旧実装は now を使わず
+    // `attested_at - 86400 >= attested_at` を評価しており常に false だった。
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let drift = now.abs_diff(pi_at);
     ok &= check(
         "attested_at is a plausible timestamp",
-        attest
-            .attested_at
-            .saturating_sub(86_400)
-            .max(1)
-            .min(attest.attested_at.saturating_add(86_400))
-            >= pi_at
-            && pi_at != 0,
+        pi_at != 0 && drift <= 86_400,
     );
 
     // The full IDi chain: IDm was read in cleartext, the proof attests to IDi,
