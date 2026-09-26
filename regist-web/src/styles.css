@@ -417,6 +417,68 @@ body {
   transition: width 0.1s linear;
 }
 
+/* ===== 顔登録カメラ ===== */
+
+.faceCam {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+  background: #04101f;
+}
+
+.faceCam__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* 前面カメラは鏡像 */
+}
+
+.faceCam__guide {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 60%;
+  aspect-ratio: 3 / 4;
+  transform: translate(-50%, -50%);
+  border: 3px dashed rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2000px rgba(4, 16, 31, 0.4);
+  pointer-events: none;
+  transition: border-color 0.2s;
+}
+
+.faceCam__guide--scan {
+  border-color: var(--aqua);
+  border-style: solid;
+  box-shadow: 0 0 0 2000px rgba(4, 16, 31, 0.4), 0 0 24px rgba(77, 162, 255, 0.5);
+}
+
+.faceCam__scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--aqua);
+  box-shadow: 0 0 10px 2px rgba(77, 162, 255, 0.8);
+  pointer-events: none;
+}
+
+.faceCam__hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20px 16px 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(0deg, rgba(4, 16, 31, 0.85), transparent);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
 /* ===== ダッシュボード ===== */
 
 .dashboard {
