@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Registration } from "../lib/storage";
 import { fetchBalance, requestCharge } from "../lib/wallet";
-import { formatIdi, maskIdi } from "../lib/idi";
+import { formatCardNumber, maskIdi } from "../lib/idi";
 
 interface Props {
   reg: Registration;
@@ -70,12 +70,12 @@ export function Dashboard({ reg, address, onReset }: Props) {
         <h2 className="card__title">登録情報</h2>
         <dl className="info">
           <div className="info__row">
-            <dt>カード番号(IDi)</dt>
-            <dd>{formatIdi(maskIdi(reg.idi))}</dd>
+            <dt>カード番号</dt>
+            <dd>{formatCardNumber(reg.cardNumber)}</dd>
           </div>
           <div className="info__row">
-            <dt>コミットメント</dt>
-            <dd className="info__mono">{reg.commitment.slice(0, 16)}…</dd>
+            <dt>IDi(発行ID)</dt>
+            <dd className="info__mono">{maskIdi(reg.idi)}</dd>
           </div>
           <div className="info__row">
             <dt>顔認証</dt>

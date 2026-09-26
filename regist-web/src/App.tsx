@@ -1,5 +1,4 @@
-import { useState } from "react";
-import type { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { useEffect, useState } from "react";
 import { Logo } from "./components/Logo";
 import { IdiStep } from "./components/IdiStep";
 import { WalletStep } from "./components/WalletStep";
@@ -11,7 +10,7 @@ import {
   saveRegistration,
   type Registration,
 } from "./lib/storage";
-import { createWallet, loadWallet, removeWallet, walletAddress } from "./lib/wallet";
+import { resolveAddress } from "./lib/wallet";
 
 type Step = "idi" | "wallet" | "face" | "done";
 
@@ -24,21 +23,41 @@ const STEP_LABELS: [Step, string][] = [
 
 /**
  * SuiCash 登録サイト(利用者のスマホ向け)。
- * カード番号(IDi)の登録 → Sui ウォレット発行 → 顔認証の利用登録(ダミー)
- * → チャージ、までを行う。決済時の顔照合は店舗の認証端末内で行われる。
+ * カード番号(IDi)の登録 → IDi から AA ウォレットを導出 → 顔認証の利用登録
+ * (ダミー)→ チャージ。決済時の顔照合は店舗の認証端末内で行われる。
  */
 export default function App() {
   const [reg, setReg] = useState<Registration | null>(() => loadRegistration());
-  const [wallet, setWallet] = useState<Ed25519Keypair | null>(() => loadWallet());
+  const [address, setAddress] = useState<string | null>(null);
 
-  const step: Step = !reg ? "idi" : !wallet ? "wallet" : !reg.faceEnrolled ? "face" : "done";
+  // ウォレットは IDi から決定的に導出する(ルータが IDi→アドレスを解決できる)。
+  useEffect(() => {
+    if (!reg) {
+      setAddress(null);
+      return;
+    }
+    let alive = true;
+    resolveAddress(reg.idi).then((addr) => {
+      if (alive) setAddress(addr);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [reg]);
+
+  const step: Step = !reg
+    ? "idi"
+    : !reg.walletCreated
+      ? "wallet"
+      : !reg.faceEnrolled
+        ? "face"
+        : "done";
   const stepIndex = STEP_LABELS.findIndex(([s]) => s === step);
 
   const reset = () => {
     clearRegistration();
-    removeWallet();
     setReg(null);
-    setWallet(null);
+    setAddress(null);
   };
 
   return (
@@ -66,17 +85,21 @@ export default function App() {
         {step === "idi" && (
           <IdiStep
             onDone={(r) => {
-              const full: Registration = { ...r, faceEnrolled: false };
+              const full: Registration = { ...r, walletCreated: false, faceEnrolled: false };
               saveRegistration(full);
               setReg(full);
             }}
           />
         )}
 
-        {step === "wallet" && (
+        {step === "wallet" && reg && (
           <WalletStep
+            idi={reg.idi}
+            address={address}
             onCreate={() => {
-              setWallet(createWallet());
+              const next = { ...reg, walletCreated: true };
+              saveRegistration(next);
+              setReg(next);
             }}
           />
         )}
@@ -91,8 +114,8 @@ export default function App() {
           />
         )}
 
-        {step === "done" && reg && wallet && (
-          <Dashboard reg={reg} address={walletAddress(wallet)} onReset={reset} />
+        {step === "done" && reg && address && (
+          <Dashboard reg={reg} address={address} onReset={reset} />
         )}
       </main>
 

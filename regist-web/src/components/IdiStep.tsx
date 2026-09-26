@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { formatIdi, idiCommitment, isValidIdi, normalizeIdi, randomSalt } from "../lib/idi";
+import { formatCardNumber, isValidCardNumber, normalizeCardNumber, toIdi } from "../lib/idi";
 import { CARD_ASPECT, ID_ROI, ocrIdCanvas } from "../lib/ocr";
 import type { Registration } from "../lib/storage";
 
 interface Props {
-  onDone: (r: Omit<Registration, "faceEnrolled">) => void;
+  onDone: (r: Pick<Registration, "cardNumber" | "idi">) => void;
 }
 
 /** カメラ OCR が使えるか(secure context + getUserMedia) */
@@ -13,7 +13,8 @@ function cameraAvailable(): boolean {
 }
 
 /**
- * IDi(カード裏面の "KA" 始まり 17 文字)の登録ステップ。
+ * カード番号(裏面の券面番号)の登録ステップ。
+ * 入力された券面番号は 8 バイト IDi へ変換して確定する。
  * カメラで券面を読み取って入力欄にプリフィルできる(結果は必ず人が確認して確定)。
  * カメラが使えない環境(非 HTTPS 等)では手入力のみ。
  */
@@ -26,35 +27,34 @@ export function IdiStep({ onDone }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const idi = normalizeIdi(raw);
-  const valid = isValidIdi(idi);
+  const cardNumber = normalizeCardNumber(raw);
+  const idi = toIdi(cardNumber);
+  const valid = isValidCardNumber(cardNumber);
 
-  const submit = async () => {
-    if (!valid || busy) return;
+  const submit = () => {
+    if (!valid || !idi || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const salt = randomSalt();
-      const commitment = await idiCommitment(idi, salt);
-      onDone({ idi, salt, commitment });
+      onDone({ cardNumber, idi });
     } catch {
-      setError("コミットメントの計算に失敗しました。ブラウザを変えてお試しください。");
+      setError("登録処理に失敗しました。もう一度お試しください。");
       setBusy(false);
     }
   };
 
   return (
     <section className="card">
-      <h2 className="card__title">1. カード番号(IDi)を登録</h2>
+      <h2 className="card__title">1. カード番号を登録</h2>
       <p className="card__desc">
-        お手持ちの交通系 IC カード<strong>裏面</strong>に記載の、
-        <strong>「KA」から始まる 17 文字</strong>の番号を登録します。
+        お手持ちの交通系 IC カード<strong>裏面右下</strong>に記載の
+        <strong>ID 番号</strong>(例 NR807 E200 1060 0517)を登録します。
       </p>
 
       {mode === "camera" ? (
         <CardScanner
           onResult={(text) => {
-            setRaw(formatIdi(text));
+            setRaw(formatCardNumber(text));
             setNotice("読み取り結果を確認し、間違いがあれば修正してください。");
             setMode("manual");
           }}
@@ -64,14 +64,14 @@ export function IdiStep({ onDone }: Props) {
       ) : (
         <>
           <label className="field">
-            <span className="field__label">カード番号(IDi)</span>
+            <span className="field__label">カード番号(裏面右下の ID)</span>
             <input
               className="field__input"
               inputMode="text"
               autoCapitalize="characters"
               autoCorrect="off"
               spellCheck={false}
-              placeholder="KA02 0920 0410 0733 3"
+              placeholder="NR807 E200 1060 0517"
               value={raw}
               onChange={(e) => {
                 setRaw(e.target.value);
@@ -80,11 +80,11 @@ export function IdiStep({ onDone }: Props) {
             />
           </label>
 
-          {idi.length > 0 && (
+          {cardNumber.length > 0 && (
             <p className={`field__check ${valid ? "field__check--ok" : ""}`}>
               {valid
-                ? `✓ ${formatIdi(idi)}`
-                : `KA + 英数字 15 文字(現在 ${idi.length}/17 文字)`}
+                ? `✓ ${formatCardNumber(cardNumber)}`
+                : "カード裏面右下の ID 番号を確認してください(対応外の発行会社の可能性)"}
             </p>
           )}
 
@@ -104,9 +104,8 @@ export function IdiStep({ onDone }: Props) {
       )}
 
       <p className="card__note">
-        番号そのものが外部へ送信されることはありません。外部に渡るのは
-        復元できないコミットメント(ハッシュ)だけで、番号はこの端末内にのみ保存されます。
-        撮影画像もこの端末内でのみ処理されます。
+        番号はこの端末内にのみ保存されます。撮影画像もこの端末内でのみ処理され、
+        外部へ送信されることはありません。
       </p>
     </section>
   );

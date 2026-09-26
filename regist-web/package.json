@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "vite preview --host --port 1919"
   },
   "dependencies": {
     "@mysten/sui": "^1.45.0",

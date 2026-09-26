@@ -34,12 +34,12 @@ function getWorker(): Promise<Worker> {
   return workerPromise;
 }
 
-/** ID 行を切り出した canvas を OCR して整形済み文字列を返す */
+/** ID 行を切り出した canvas を OCR して整形済み券面番号を返す */
 export async function ocrIdCanvas(canvas: HTMLCanvasElement): Promise<string> {
   const prepared = preprocess(canvas);
   const worker = await getWorker();
   const { data } = await worker.recognize(prepared);
-  return cleanIdi(data.text);
+  return cleanCardNumber(data.text);
 }
 
 /**
@@ -127,14 +127,21 @@ const LETTER_TO_DIGIT: Record<string, string> = {
 };
 
 /**
- * OCR 結果を IDi 形式へ整形する。
- * 先頭 2 文字は英字プレフィックス(例 KA)として保持し、
- * 3 文字目以降の英字は数字の見間違いとして数字化。17 文字で切る。
+ * OCR 結果を券面番号の形へ整形する。
+ * 券面番号は「発行会社の英字2文字 + 追加識別子4桁(16進) + 発行日6桁 + 連番5桁」
+ * = 17 文字。先頭 2 文字は英字プレフィックス(例 NR / KA)として保持し、
+ * 3 文字目以降の英字のうち 16 進で表れない字(数字の見間違い)は数字化する。
+ * ※3〜6 文字目は 16 進なので A〜F はそのまま残す。
  */
-export function cleanIdi(rawText: string): string {
+export function cleanCardNumber(rawText: string): string {
   const s = rawText.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  let out = s.slice(0, 2);
-  for (const ch of s.slice(2)) {
+  let out = s.slice(0, 2); // 発行会社プレフィックス
+  s.slice(2, 6).split("").forEach((ch) => {
+    // 追加識別子(16進4桁): A-F は温存し、それ以外の英字のみ数字化
+    out += /[0-9A-F]/.test(ch) ? ch : (LETTER_TO_DIGIT[ch] ?? ch);
+  });
+  for (const ch of s.slice(6)) {
+    // 発行日6桁 + 連番5桁: すべて 10 進数字
     out += /[0-9]/.test(ch) ? ch : (LETTER_TO_DIGIT[ch] ?? ch);
   }
   return out.slice(0, 17);

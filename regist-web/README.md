@@ -10,20 +10,47 @@ npm run dev      # 開発サーバ
 npm run build    # 型チェック + 本番ビルド
 ```
 
-## Docker(ポート 1919)
+## デプロイ
+
+`npm run build` の出力 `dist/` は**純粋な静的サイト**(相対パス出力)。
+サーバープロセスは不要で、置き方は 3 通りある。用途に合わせて選ぶ。
+
+### 方法 A(推奨): 静的ホスティング
+
+Cloudflare Pages / GitHub Pages / Netlify / Vercel などに `dist/` を上げる。
+**HTTPS が自動で付く**ので、スマホの券面カメラ OCR(`getUserMedia` は
+secure context 必須)がそのまま動く。Docker もサーバー常駐も要らない。
+
+- ビルドコマンド: `npm ci && npm run build`
+- 公開ディレクトリ: `dist`
+- SPA フォールバック: 404 → `/index.html`(各ホストの設定で指定)
+
+### 方法 B: Node のある任意サーバー(Docker 不要・ポート 1919)
+
+```sh
+npm ci && npm run build
+npm start          # = vite preview --host --port 1919
+# → http://<サーバー>:1919
+```
+
+### 方法 C: 既存の Web サーバー(nginx / caddy 等)で配信
+
+`dist/` をドキュメントルートに置き、SPA フォールバック(全パス → index.html)
+を設定するだけ。`nginx.conf`(ポート 1919・フォールバック済み)を同梱している。
+
+### 方法 D: Docker(使える環境なら)
 
 ```sh
 docker build -t suicash-regist-web .
 docker run --rm -p 1919:1919 suicash-regist-web
-# → http://localhost:1919
 ```
 
 > **カメラ読み取りの注意**: 券面 OCR は `getUserMedia` を使うため
-> **secure context(HTTPS または localhost)必須**。スマホから
-> `http://<PCのIP>:1919` の平文 HTTP で開くとカメラは使えない
-> (手入力は使える)。スマホでカメラ OCR を試すときは
-> ngrok / Tailscale / リバースプロキシ等で HTTPS 化するか、
-> `adb reverse` で端末の localhost に見せること。
+> **secure context(HTTPS または localhost)必須**。平文 HTTP の
+> `http://<IP>:1919` をスマホで開くとカメラは使えない(手入力は動く)。
+> スマホでカメラ OCR を使うなら方法 A の HTTPS ホスティングが最も簡単。
+> 自前サーバーで HTTP しか無い場合は Caddy 等でリバースプロキシして
+> HTTPS を付けるか、手入力で運用する。
 
 ## 登録フロー
 
