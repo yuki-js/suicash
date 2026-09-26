@@ -30,6 +30,7 @@
   --card-shadow:0 24px 48px -20px rgba(10,26,47,.35);
   --shadow:0 1px 3px rgba(10,26,47,.08),0 1px 2px rgba(10,26,47,.05);
   --wordmark-ic-fill:#ffffff;
+  --portrait-filter:none;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
@@ -47,6 +48,7 @@
     --card-shadow:0 24px 48px -20px rgba(0,0,0,.6);
     --shadow:none;
     --wordmark-ic-fill:#0b1420;
+    --portrait-filter:invert(1);
     color-scheme:dark;
   }
 }
@@ -65,6 +67,7 @@
   --card-shadow:0 24px 48px -20px rgba(0,0,0,.6);
   --shadow:none;
   --wordmark-ic-fill:#0b1420;
+  --portrait-filter:invert(1);
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -270,6 +273,7 @@ section.alt .feature code{background:var(--panel)}
 
 /* tribute */
 .tribute{padding-block:8px 72px;text-align:center}
+.tribute .portrait{display:block;width:96px;height:auto;margin:0 auto 14px;filter:var(--portrait-filter)}
 .tribute p{margin:0;font-size:clamp(20px,3vw,26px);font-weight:900;letter-spacing:.04em}
 .tribute a{display:inline-block;margin-top:10px;font-size:13.5px;font-weight:500;border-bottom:1px solid currentColor}
 .tribute a:hover{color:var(--aqua)}
@@ -644,6 +648,7 @@ footer ul a:hover{color:var(--aqua-strong)}
 
 <aside class="tribute">
   <div class="wrap">
+    <img class="portrait" src="img/kirishiki.png" width="114" height="144" decoding="async" alt="切敷 裕大の似顔絵" data-i18n-alt="tribute.img" />
     <p data-i18n="tribute.text">切敷 裕大を崇めよ</p>
     <a href="https://soltia48.github.io/felica-users-manual-unofficial/" rel="noopener" data-i18n="tribute.link">FeliCa カード ユーザーズマニュアル(非公式版) <span aria-hidden="true">↗</span></a>
   </div>
@@ -765,6 +770,7 @@ const EN = {
   "mascot.p": "Chiikimo is a chimera of a penguin and \"something.\" Flippers of different lengths, a low center of gravity, and a mouth that splits wider than its face. It lives on the right side of the SuiCash card, always keeping an eye on your payments.",
   "mascot.aria": "Chiikimo, the SuiCash mascot",
   "foot.disc": "SuiCash is a demonstration product showing the fusion of FeliCa and the Sui blockchain. It is not a real payment service, and it has no affiliation with East Japan Railway Company, Suica, Sony Corporation or FeliCa.",
+  "tribute.img": "Portrait of 切敷 裕大",
   "tribute.text": "All hail 切敷 裕大",
   "tribute.link": "FeliCa Card User's Manual (Unofficial Edition) <span aria-hidden=\"true\">↗</span>",
   "foot.res": "Resources",
