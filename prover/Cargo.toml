@@ -11,6 +11,9 @@ rand = "0.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 felica = { version = "1.0.3", default-features = false }
+# `felica-fixture` pins the same session constants as `tests/common`; the
+# literal form is how those vectors stay readable.
+hex-literal = "1.1.0"
 ark-bn254 = "0.5"
 ark-ff = "0.5"
 ark-serialize = "0.5"

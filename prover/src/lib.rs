@@ -295,6 +295,20 @@ pub fn verify_attestation(vk: &FelicaVerifyingKey, att: &Attestation) -> bool {
 /// *and* constrains the key schedule D1–D3 from `gsk`/`usk`/`idm`. `pk` is the
 /// externally generated proving key — this function never generates keys.
 pub fn prove(pk: &FelicaProvingKey, req: &ProveRequest) -> Result<Attestation, ProverError> {
+    prove_compressed(pk, req).map(|(att, _)| att)
+}
+
+/// [`prove`], plus the Arkworks canonical compressed proof bytes.
+///
+/// The RPC surface hex-encodes each coordinate separately, which is what the
+/// JSON consumers parse. `sui::groth16` instead consumes the Arkworks
+/// *compressed* serialization as a single blob, so a Move verifier needs this
+/// second form. Emitting it here keeps one proving path: the bytes are a
+/// serialization of the same proof object, not a second proof system.
+pub fn prove_compressed(
+    pk: &FelicaProvingKey,
+    req: &ProveRequest,
+) -> Result<(Attestation, Vec<u8>), ProverError> {
     use des::{cbc_decrypt, command_mac, des_encrypt, tdes_decrypt, tdes_encrypt};
 
     // Native mirror of D1-D3, for typed pre-checks and hints only. The
@@ -358,18 +372,26 @@ pub fn prove(pk: &FelicaProvingKey, req: &ProveRequest) -> Result<Attestation, P
         return Err(ProverError::ProveFailed);
     }
 
-    Ok(Attestation {
-        idi,
-        attested_at: req.attested_at,
-        proof: Groth16Proof {
-            alg: SUPPORTED_ALG.to_string(),
-            a: (fq_to_hex(&proof.a.x), fq_to_hex(&proof.a.y)),
-            b: (
-                (fq_to_hex(&proof.b.x.c0), fq_to_hex(&proof.b.x.c1)),
-                (fq_to_hex(&proof.b.y.c0), fq_to_hex(&proof.b.y.c1)),
-            ),
-            c: (fq_to_hex(&proof.c.x), fq_to_hex(&proof.c.y)),
-            public_inputs: pis.iter().map(fr_to_hex).collect(),
+    let mut compressed = Vec::new();
+    proof
+        .serialize_compressed(&mut compressed)
+        .map_err(|_| ProverError::ProveFailed)?;
+
+    Ok((
+        Attestation {
+            idi,
+            attested_at: req.attested_at,
+            proof: Groth16Proof {
+                alg: SUPPORTED_ALG.to_string(),
+                a: (fq_to_hex(&proof.a.x), fq_to_hex(&proof.a.y)),
+                b: (
+                    (fq_to_hex(&proof.b.x.c0), fq_to_hex(&proof.b.x.c1)),
+                    (fq_to_hex(&proof.b.y.c0), fq_to_hex(&proof.b.y.c1)),
+                ),
+                c: (fq_to_hex(&proof.c.x), fq_to_hex(&proof.c.y)),
+                public_inputs: pis.iter().map(fr_to_hex).collect(),
+            },
         },
-    })
+        compressed,
+    ))
 }

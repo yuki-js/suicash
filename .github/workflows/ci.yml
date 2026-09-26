@@ -6,11 +6,13 @@ on:
     paths:
       - 'prover/**'
       - 'server/**'
+      - 'sui/**'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - 'prover/**'
       - 'server/**'
+      - 'sui/**'
       - '.github/workflows/ci.yml'
   workflow_dispatch:
 
@@ -110,6 +112,63 @@ jobs:
         run: |
           cargo test --release --locked --manifest-path prover/Cargo.toml \
             --test forgery_authority -- --ignored
+
+  # The Move package is only meaningful against a real key and a real proof,
+  # so this job regenerates the fixture from the committed ceremony assets
+  # rather than trusting the checked-in hex. If the fixture cannot be
+  # reproduced, the committed one no longer matches the key and every pairing
+  # test below is verifying nothing.
+  move:
+    name: sui verifier
+    runs-on: ubuntu-latest
+    needs: check
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: prover
+
+      - name: Install Sui
+        run: |
+          set -euo pipefail
+          version=$(curl -sL -o /dev/null -w '%{url_effective}' \
+            https://github.com/MystenLabs/sui/releases/latest | sed 's|.*/tag/||')
+          echo "installing sui $version"
+          curl -sL "https://github.com/MystenLabs/sui/releases/download/${version}/sui-${version}-ubuntu-x86_64.tgz" \
+            | tar xz
+          echo "$RUNNER_TEMP/sui" >> "$GITHUB_PATH"
+
+      - name: Reproduce the committed fixture from the committed key
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --manifest-path prover/Cargo.toml --bin felica-fixture
+          cp prover/assets/verifying_key.bin /tmp/vk.bin
+          ./prover/target/release/felica-fixture prover/assets/proving_key.bin /tmp/fixture.move
+          # The proof is randomized, so compare only the part that must be
+          # reproducible: the pinned key.
+          python3 - <<'EOF'
+          import re
+          def vk_of(path):
+              src = open(path).read()
+              return re.search(r'public fun vk\(\): vector<u8> \{ x"([0-9a-f]+)" \}', src).group(1)
+          assert vk_of('/tmp/fixture.move') == open('/tmp/vk.bin','rb').read().hex(), \
+              'regenerated fixture key != committed verifying_key.bin'
+          print('fixture key matches the committed verifying key')
+          EOF
+
+      - name: Build and test the Move package
+        run: |
+          set -euo pipefail
+          sui move build --path sui/felica_oracle
+          sui move test --path sui/felica_oracle
 
   image:
     name: docker image

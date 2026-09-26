@@ -64,6 +64,12 @@ was unimplementable off-Rust. With no commitment in the statement, the
 
 The 360-byte `vk` is exactly Sui's BN254 size for `n = 3`. No conversion.
 
+`../sui/felica_oracle/` is the consumer: a Move package that pins the `vk` and
+verifies proofs with `sui::groth16`. `prove_compressed` exists for it — the RPC
+surface hex-encodes coordinates one at a time, but Move wants the Arkworks
+compressed proof as one blob. Same proof object, second serialization; there is
+still only one proving path.
+
 Also gone: the read path. `auth2` already carries `idi`, so the single-block
 `Read`, the encrypted response, and `R2` publication all drop out of the
 statement. `R2` is now a private witness — nobody can decrypt the read
@@ -132,6 +138,7 @@ cargo build --release                        # clean
 cargo fmt --check                            # clean
 cargo clippy --all-targets -- -D warnings    # clean
 cargo test --release                         # 42 passed, 0 failed, 1 ignored
+sui move test --path ../sui/felica_oracle    # 25 passed, 0 failed
 ```
 
 Tests need a ceremony proving key:
@@ -156,9 +163,17 @@ src/abi.rs       3-field packing; the single bytes <-> field mapping
 src/circuit.rs   DES gadgets + D1-D3 + C1-C6
 src/des.rs       native DES/3DES/CBC/MAC, shared tables, differential-tested
 src/setup.rs     key load/encode; never generates on the proving path
-src/bin/         felica-setup (ceremony), felica-keys (provisioning)
+src/bin/         felica-setup (ceremony), felica-keys (provisioning),
+                 felica-fixture (regenerates the Move test fixture)
 tests/           attest_prove, circuit_robust, forgery_authority
 ```
+
+`felica-fixture` writes `../sui/felica_oracle/tests/fixture.move`: the real
+`vk` plus a real proof, so the Move tests run a live pairing against the
+ceremony key instead of a shape check. It is generated rather than
+hand-copied for the reason the `cm` limb was dropped — a stale blob that no
+longer matches the key still "verifies" nothing, and a test that has quietly
+stopped verifying anything looks exactly like a passing test.
 
 `setup.rs` and the two binaries are near-verbatim from the reference; the
 substantive changes are confined to `abi.rs`, `circuit.rs` and `lib.rs`.
