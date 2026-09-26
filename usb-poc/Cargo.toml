@@ -25,3 +25,9 @@ rand = "0.8"
 [[bin]]
 name = "usb-poc"
 path = "src/main.rs"
+
+# The RC-S634/UA (054c:06c2) is the embedded-module variant of the RC-S380 and
+# speaks the same Port-100 protocol, but upstream felica 1.0.3 only lists
+# 06c1/06c3. The vendored copy adds 06c2 to the port100 PID list.
+[patch.crates-io]
+felica = { path = "vendor/felica" }

@@ -1,0 +1,103 @@
+//! FeliCa Standard card protocol.
+//!
+//! This module implements the application-layer packet format, file-system
+//! addressing, response-time calculations, mutual authentication, secure
+//! messaging, and an in-process card emulator for FeliCa Standard cards over
+//! NFC-F. The same polling and transport layer underpins NFC Forum Type 3 Tags.
+//! Reader-specific RF framing remains behind the [`FelicaDriver`] trait.
+//!
+//! ## Key Types
+//!
+//! - [`FelicaStandard`] - Main interface for FeliCa card operations
+//! - [`FelicaDriver`] - Trait implemented by NFC reader drivers
+//! - [`ServiceCode`] - FeliCa service code representation
+//! - [`BlockListElement`] - Block list element for read/write operations
+//! - [`AuthenticatedContext`] - State of a DES or AES secure session
+//! - [`FelicaStandardCommand`] and [`FelicaStandardResponse`] - low-level packet
+//!   representations for relays, emulators, and protocol tooling
+//!
+//! ## Card model
+//!
+//! A card can contain several **systems**, each identified by a system code. A
+//! system contains a hierarchy of **areas** and **services**, and every service
+//! owns one or more 16-byte blocks. [`ServiceCode`] decodes the service number,
+//! service kind, access permissions, and authentication requirement.
+//! [`BlockListElement`] then selects a block through the zero-based position of
+//! its service in the command's service-code list.
+//!
+//! Commands for authentication-free services use
+//! [`FelicaStandard::read_without_encryption`] and
+//! [`FelicaStandard::write_without_encryption`]. Services whose attributes
+//! require authentication are accessed through a DES or AES session established
+//! by [`FelicaStandard::mutual_authentication`] or
+//! [`FelicaStandard::mutual_authentication_v2`].
+//!
+//! ## Example
+//!
+#![cfg_attr(feature = "usb", doc = "```no_run")]
+#![cfg_attr(not(feature = "usb"), doc = "```ignore")]
+//! use felica::prelude::*;
+//!
+//! fn read_card(reader: &mut Reader) -> Result<(), FelicaStandardError> {
+//!     // Poll for a FeliCa card with any system code
+//!     let (mut felica, polling) = FelicaStandard::polling(
+//!         reader.driver_mut(), "212F", 0xFFFF, 0x00, 0x00
+//!     )?;
+//!     
+//!     println!("Found card with IDm: {:02X?}", felica.idm());
+//!     Ok(())
+//! }
+//! ```
+//!
+//! ## Specification references
+//!
+//! Terminology, field encodings, limits, and section references in this module
+//! follow *FeliCa Card User's Manual, Excerpted Edition*, version 2.31
+//! (M617-E02-31 / M617-J02-31). Details not present in that excerpt are described
+//! from the accompanying unofficial users-manual project. Product-dependent
+//! limits and optional commands must still be confirmed against the manual for
+//! the particular card product.
+
+mod api;
+mod command;
+mod constants;
+mod emulator;
+mod error;
+mod keys;
+mod payload;
+mod redact;
+mod response;
+mod secure;
+mod type3;
+mod types;
+
+pub use api::{FelicaDriver, FelicaStandard};
+pub use command::FelicaStandardCommand;
+pub use emulator::{
+    CommunicationPerformance, DirectoryEntry, EmulatedArea, EmulatedService, EmulatedSystem,
+    EmulatorConfigError, FelicaStandardEmulator, LimitPurseProperty,
+};
+pub use error::FelicaStandardError;
+pub use keys::{
+    DerivedAuthKeys, KeyError, KeyRecordWarning, KeyStore, KeyStoreLoad, NodeKey, ResolvedNodeKeys,
+};
+pub use response::FelicaStandardResponse;
+pub use secure::{
+    AuthenticatedContext, Authentication2Response, Authentication2V2Response,
+    SecureSessionCredentials, SecureSessionCredentialsRef, SecureSessionScheme,
+    generate_group_key_v2_aes128, generate_service_keys_des,
+};
+pub use type3::{Type3TagPollingResult, polling_timeout_ms};
+pub use types::{
+    AreaCodeRange, BlockListElement, ChangeKeyParameters, ContainerInformation, ContainerProperty,
+    GetAreaInformationResult, GetNodePropertyResult, GetSystemStatusResult,
+    MutualAuthenticationResult, NodeProperty, NodePropertyType, OptionVersion, ReadResult,
+    ReadWithoutEncryptionResult, RegisterIssueIdResult, RegisterServiceResult,
+    RequestBlockInformationExResult, RequestCodeListResult, RequestServiceV2KeyVersion,
+    RequestServiceV2Result, SearchServiceCodeResult, ServiceAttribute, ServiceCode, ServiceKind,
+    SetParameterEncryptionType, SetParameterPacketType, SpecificationVersion, StatusFlag1,
+    StatusFlag2, status_flag_description,
+};
+
+pub(crate) use command::frame_with_length_prefix;
+pub(crate) use constants::*;

@@ -67,9 +67,7 @@ struct RpcError {
 
 #[derive(Debug, Deserialize)]
 struct Reply<T> {
-    #[serde(default)]
     result: Option<T>,
-    #[serde(default)]
     error: Option<RpcError>,
 }
 
@@ -109,17 +107,14 @@ impl Oracle {
             "params": params,
         });
 
-        let mut response = self
+        // A non-2xx status here is a proxy/ingress failure, not a JSON-RPC error;
+        // ureq surfaces it as `Error::Status`, which `?` turns into a failure.
+        let response = self
             .agent
             .post(&self.base)
             .set("Content-Type", "application/json")
             .send_json(body)
             .with_context(|| format!("POST {method} to {}", self.base))?;
-
-        // A non-2xx status here is a proxy/ingress failure, not a JSON-RPC error.
-        if let Err(err) = response.error() {
-            bail!("{method}: HTTP {err} from {}", self.base);
-        }
 
         let reply: Reply<T> = response
             .into_json()

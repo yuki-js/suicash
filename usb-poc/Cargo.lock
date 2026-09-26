@@ -705,8 +705,6 @@ dependencies = [
 [[package]]
 name = "felica"
 version = "1.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "798969c1214f94201c606c78e82ba26d11b6911ccff3b2d69016e0d763654cfd"
 dependencies = [
  "aes",
  "cbc",
@@ -1453,20 +1451,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
-name = "usb-poc"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "felica",
- "hex",
- "prover",
- "rand 0.8.8",
- "serde",
- "serde_json",
- "ureq",
-]
-
-[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1627,6 +1611,20 @@ dependencies = [
  "idna",
  "percent-encoding",
  "serde",
+]
+
+[[package]]
+name = "usb-poc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "felica",
+ "hex",
+ "prover",
+ "rand 0.8.8",
+ "serde",
+ "serde_json",
+ "ureq",
 ]
 
 [[package]]
