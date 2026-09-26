@@ -1,11 +1,42 @@
-# SuiCash 顔認証フロントエンド (face-auth-ui)
+# SuiCash 決済端末 UI (face-auth-ui)
 
-SuiCash 端末(Hi-CARA)の顔認証 UI。React 製で、端末上の WebView シェル
+SuiCash の決済端末(Hi-CARA)の UI。React 製で、端末上の WebView シェル
 (`device-shell/`)に全画面表示して使う。顔認証エンジンには端末組み込みの
 商用エンジン(SAFR eSDK)を利用する。エンジンのバイナリ・モデル・ライセンスは
 再配布できないためリポジトリには含めておらず、無い環境ではモック
 (`src/sim.ts`)が同じ応答仕様(confidence レンジ・品質しきい値・結果コード)で
 動くので、UI 開発はブラウザだけで完結する。
+
+## 端末の役割と母艦連携
+
+Hi-CARA は FeliCa を直接読めない(リーダーは母艦 PC 側)。よって
+**母艦(PC)が FeliCa を読み、オラクルで IDi を認証し、オンチェーン決済まで担う**。
+端末はイベントで駆動される UI 専任(母艦↔端末プロトコルは `src/terminal.ts`)。
+
+母艦 → 端末イベント: `card`(タッチ+IDi認証済み)/ `mode`(残高照会 or 決済待機+額)/
+`paymentResult`(送金結果)/ `cardRemoved`。
+端末 → 母艦レポート: `faceOk` / `faceNg` / `enrolled` / `cancel`。
+
+### 画面フロー
+
+```
+waiting(カード待ち。母艦CLIの設定=残高照会/決済Nを表示)
+  └ card
+      ├ 未登録(オンチェーン登録なし) → registerPrompt(スマホで登録案内)
+      ├ 登録済み & 端末に顔なし     → enroll(顔登録。IDi キーで端末内保持)
+      └ 登録済み & 顔あり           → auth(顔認証)
+    └ 顔OK
+        ├ 待機モード → balance(残高照会のみ)
+        └ 決済モード → paying → lcd(改札 LCD 風に引去額+残額)
+```
+
+顔照合は端末内で完結し、顔データは端末の外へ出ない(顔の ZKP はローカルのみ)。
+オンチェーン決済は母艦が IDi 導出鍵で署名して行う。
+
+### ブラウザでの動作確認
+
+`?debug=1` を付けると「母艦シミュレータ」パネルが出て、`card` / `mode` /
+`paymentResult` を手で流して全フローを確認できる(実機・母艦なしで検証可)。
 
 ```sh
 npm install
