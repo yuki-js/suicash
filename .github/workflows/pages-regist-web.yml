@@ -1,11 +1,13 @@
 name: Deploy regist-web to GitHub Pages
 
-# face-regist の regist-web/** に push されると、Actions がビルドして
+# main の regist-web/** に push(またはマージ)されると、Actions がビルドして
 # GitHub Pages に公開する(HTTPS 付き = カメラ OCR も動く)。
+# main はデフォルトブランチなので github-pages 環境の既定ポリシーで許可され、
+# 環境のブランチ保護設定を触らずにデプロイできる。
 # 公開 URL: https://yuki-js.github.io/suicash/
 on:
   push:
-    branches: [face-regist]
+    branches: [main]
     paths:
       - "regist-web/**"
       - ".github/workflows/pages-regist-web.yml"
