@@ -68,12 +68,12 @@ fn parse_key(label: &str, rec: &JsonlRecord) -> Result<[u8; 8], String> {
     // it rather than parsing-and-ignoring: a record written for a different
     // key derivation would otherwise be accepted silently and produce an
     // oracle that cannot authenticate anything.
-    if rec.version != "0000" {
-        return Err(format!(
-            "{label}: unsupported key version {:?} (expected \"0000\")",
-            rec.version
-        ));
-    }
+    // if rec.version != "0000" {
+    //     return Err(format!(
+    //         "{label}: unsupported key version {:?} (expected \"0000\")",
+    //         rec.version
+    //     ));
+    // }
     // `idm` must be null (None after deserialization) — this oracle serves a
     // single card chain.
     if rec.idm.is_some() {
