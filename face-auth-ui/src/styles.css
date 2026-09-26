@@ -815,13 +815,6 @@ body {
   border-color: var(--aqua);
 }
 
-.waiting__cardface {
-  display: block;
-  width: 172px;
-  height: auto;
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.45));
-}
-
 .waiting__tapgif {
   display: block;
   width: 168px;
