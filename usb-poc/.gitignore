@@ -1,0 +1,6 @@
+target/
+
+# FeliCa key material. `prover/src/bin/felica-keys.rs` writes both of these in
+# plaintext; neither belongs in version control.
+keys.json
+keys.jsonl

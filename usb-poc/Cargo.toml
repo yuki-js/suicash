@@ -1,0 +1,27 @@
+[package]
+name = "usb-poc"
+version = "0.1.0"
+edition = "2021"
+description = "CLI proof of concept: attest a real Suica IDi against the FeliCa oracle and verify the Groth16 proof"
+license = "MIT"
+publish = false
+
+[dependencies]
+# `usb` is required for the Port-100 driver, which is what an RC-S380 speaks.
+# `default-features = false` plus the explicit feature documents that this
+# binary wants exactly one optional dependency and no more.
+felica = { version = "1.0.3", default-features = false, features = ["usb"] }
+
+# Only the verifying side is used. The proving key never leaves the oracle.
+prover = { path = "../prover" }
+
+ureq = { version = "2.10", features = ["tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+anyhow = "1"
+rand = "0.8"
+
+[[bin]]
+name = "usb-poc"
+path = "src/main.rs"
