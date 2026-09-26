@@ -29,7 +29,9 @@ use felica::felica_standard::{
 };
 use hex_literal::hex;
 use prover::des::{des_encrypt, tdes_decrypt, tdes_encrypt};
-use prover::{load_proving_key, prove_compressed, proof_compressed_bytes, public_inputs_bytes, ProveRequest};
+use prover::{
+    load_proving_key, proof_compressed_bytes, prove_compressed, public_inputs_bytes, ProveRequest,
+};
 use rand::RngCore;
 
 /// Fixture card, identical to `felica-fixture` and `tests/common`.
