@@ -1,4 +1,5 @@
 import { mistToSui } from "../terminal";
+import { SuiCashCard } from "./SuiCashCard";
 
 interface Props {
   /** null=待機(残高照会のみ)/ 決済待機なら引き落とし額(MIST) */
@@ -14,16 +15,7 @@ export function WaitingScreen({ payment }: Props) {
       </div>
 
       <div className="waiting__mark" aria-hidden="true">
-        <svg viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="52" className="waiting__ring" />
-          <path
-            d="M42 54 h30 M42 62 h30 M42 70 h20"
-            className="waiting__wave"
-            fill="none"
-            strokeLinecap="round"
-          />
-          <rect x="40" y="38" width="40" height="30" rx="5" className="waiting__card" />
-        </svg>
+        <SuiCashCard className="waiting__cardface" />
       </div>
 
       <h1 className="waiting__title">カードをタッチ</h1>
