@@ -50,6 +50,18 @@ declare global {
     __facepayEvent?: (json: string) => void;
     /** シェルが公開する母艦へのレポート口 */
     FacePayNative?: { report(json: string): void };
+    /** シェルが公開する上部 RGB LED 制御 */
+    LedNative?: { set(mode: string): void };
+  }
+}
+
+/** 上部 LED を設定(シェルが無い開発環境では no-op) */
+export type LedMode = "off" | "blue_blink" | "green" | "red" | "blue";
+export function setLed(mode: LedMode): void {
+  try {
+    window.LedNative?.set(mode);
+  } catch {
+    /* ignore */
   }
 }
 

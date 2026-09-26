@@ -815,20 +815,9 @@ body {
   border-color: var(--aqua);
 }
 
-.waiting__mark {
-  position: relative;
-  width: 156px;
-  height: 156px;
-}
-
-.waiting__ringSvg {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+.waiting__mark svg {
+  width: 128px;
+  height: 128px;
 }
 
 .waiting__ring {
@@ -844,17 +833,15 @@ body {
   100% { transform: scale(1.1); opacity: 0.2; }
 }
 
-/* SuiCash カード券面。リングの中央に少し傾けて重ねる */
-.waiting__cardArt {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 124px;
-  height: 78px;
-  margin-left: -62px;
-  margin-top: -39px;
-  transform: rotate(-6deg);
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+.waiting__card {
+  fill: none;
+  stroke: var(--aqua);
+  stroke-width: 3.5;
+}
+
+.waiting__wave {
+  stroke: var(--aqua);
+  stroke-width: 3.5;
 }
 
 .waiting__title {

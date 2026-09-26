@@ -8,7 +8,7 @@ import { BalanceInquiry } from "./components/BalanceInquiry";
 import { GateLcd } from "./components/GateLcd";
 import { createEngine } from "./engine";
 import { DEFAULT_THRESHOLD } from "./sim";
-import { subscribe, report, type TerminalEvent } from "./terminal";
+import { subscribe, report, setLed, type LedMode, type TerminalEvent } from "./terminal";
 
 /**
  * 決済端末(Hi-CARA)の UI 状態機械。
@@ -79,6 +79,33 @@ export default function App() {
     setCard(null);
     setLcd(null);
   }, []);
+
+  // 画面遷移に応じて上部 LED を制御
+  useEffect(() => {
+    let mode: LedMode;
+    switch (screen) {
+      case "detecting":
+      case "enroll":
+      case "auth":
+        mode = "blue_blink"; // 認証中は青点滅
+        break;
+      case "balance":
+        mode = "green"; // 本人確認OK
+        break;
+      case "registerPrompt":
+        mode = "red"; // 未登録
+        break;
+      case "lcd":
+        mode = lcd?.ok ? "green" : "red"; // 決済成功=緑 / 失敗(残高なし等)=赤
+        break;
+      case "paying":
+        mode = "blue_blink";
+        break;
+      default:
+        mode = "off"; // 待機
+    }
+    setLed(mode);
+  }, [screen, lcd]);
 
   // 母艦イベントの購読
   useEffect(() => {
