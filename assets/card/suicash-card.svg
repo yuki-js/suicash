@@ -25,36 +25,41 @@
     <!-- 左上の挿入方向マーク(交通系カードの意匠) -->
     <path d="M 15 2.2 L 10.4 4.3 L 15 6.4 Z" fill="#0a1a2f" opacity="0.7" />
 
-    <!-- 右上の IC マーク(汎用・非ブランド) -->
-    <g opacity="0.85">
-      <rect x="146" y="8" width="17" height="11" rx="2.2" fill="none" stroke="#0a1a2f" stroke-width="1.1" />
-      <text x="154.5" y="16.6" text-anchor="middle" font-family="REM, sans-serif" font-weight="700" font-size="7.2" fill="#0a1a2f">IC</text>
-    </g>
-
-    <!-- マスコット(SuiCash オリジナル)。ペンギン位置にらくがき風で -->
-    <g transform="translate(122 42) scale(0.34)">
-      <!-- 触手あし -->
-      <g fill="none" stroke="#0a1a2f" stroke-width="6" stroke-linecap="round">
-        <path d="M 34 132 C 32 140 30 145 25 149" />
-        <path d="M 50 133 C 50 141 50 146 50 150" />
-        <path d="M 66 132 C 68 140 70 145 75 149" />
+    <!-- マスコット(assets/mascot/suicash-mascot.svg をそのまま埋め込み)。ペンギン位置に -->
+    <g transform="translate(110 36.4) scale(0.113)">
+      <g fill="none" stroke-linecap="round">
+        <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" stroke-width="78" />
+        <path d="M318 204 C340 164 366 130 396 112" stroke="#0A1A2F" stroke-width="62" />
+        <path d="M198 206 C180 150 162 92 158 46" stroke="#4DA2FF" stroke-width="64" />
+        <path d="M318 204 C340 164 366 130 396 112" stroke="#4DA2FF" stroke-width="48" />
       </g>
-      <!-- ひれ -->
-      <g fill="#4DA2FF" stroke="#0a1a2f" stroke-width="6" stroke-linejoin="round">
-        <path d="M 15 64 C 3 56 -1 42 6 32 C 13 40 19 52 22 60 Z" />
-        <path d="M 85 64 C 97 70 101 84 95 94 C 88 86 82 74 80 68 Z" />
+      <g fill="none" stroke-linecap="round">
+        <path d="M148 330 C142 382 138 414 137 442" stroke="#0A1A2F" stroke-width="50" />
+        <path d="M222 330 C219 372 216 404 215 428" stroke="#0A1A2F" stroke-width="44" />
+        <path d="M296 330 C300 368 302 398 303 418" stroke="#0A1A2F" stroke-width="44" />
+        <path d="M364 330 C370 382 374 414 375 442" stroke="#0A1A2F" stroke-width="50" />
+        <path d="M137 438 L104 482 M137 438 L137 492 M137 438 L170 482" stroke="#0A1A2F" stroke-width="36" />
+        <path d="M375 438 L342 482 M375 438 L375 492 M375 438 L408 482" stroke="#0A1A2F" stroke-width="36" />
+        <path d="M148 330 C142 382 138 414 137 442" stroke="#4DA2FF" stroke-width="38" />
+        <path d="M222 330 C219 372 216 404 215 428" stroke="#4DA2FF" stroke-width="32" />
+        <path d="M296 330 C300 368 302 398 303 418" stroke="#4DA2FF" stroke-width="32" />
+        <path d="M364 330 C370 382 374 414 375 442" stroke="#4DA2FF" stroke-width="38" />
+        <path d="M137 438 L104 482 M137 438 L137 492 M137 438 L170 482" stroke="#4DA2FF" stroke-width="24" />
+        <path d="M375 438 L342 482 M375 438 L375 492 M375 438 L408 482" stroke="#4DA2FF" stroke-width="24" />
       </g>
-      <!-- 胴体 -->
-      <path d="M 50 10 C 74 10 88 30 87 60 C 86 84 83 102 79 118 C 76 128 68 132 50 132 C 32 132 24 128 21 118 C 17 102 14 84 13 60 C 12 30 26 10 50 10 Z" fill="#4DA2FF" stroke="#0a1a2f" stroke-width="6" stroke-linejoin="round" />
-      <!-- おなか -->
-      <path d="M 50 56 C 65 56 73 72 72 92 C 71 110 63 120 50 120 C 37 120 29 110 28 92 C 27 72 35 56 50 56 Z" fill="#ffffff" />
-      <!-- かお -->
-      <circle cx="37" cy="40" r="5.5" fill="#0a1a2f" />
-      <circle cx="63" cy="40" r="5.5" fill="#0a1a2f" />
-      <circle cx="38.5" cy="38.5" r="2" fill="#ffffff" />
-      <circle cx="64.5" cy="38.5" r="2" fill="#ffffff" />
-      <path d="M 45 48 L 55 48 L 50 56 Z" fill="#0a1a2f" />
-      <path d="M 32 64 C 40 71 60 71 68 64" fill="none" stroke="#0a1a2f" stroke-width="3.5" stroke-linecap="round" />
+      <g stroke="#0A1A2F" stroke-width="10" stroke-linejoin="round">
+        <path fill="#4DA2FF" d="M272 124 C358 128 424 174 432 246 C438 304 402 348 342 366 C276 386 134 392 100 354 C66 316 78 256 108 214 C144 164 202 122 272 124 Z" />
+        <path fill="#FFFFFF" d="M236 250 C284 248 312 270 314 302 C316 334 294 356 252 360 C208 364 174 348 170 318 C166 286 190 252 236 250 Z" />
+      </g>
+      <g>
+        <circle cx="215" cy="292" r="9.5" fill="#0A1A2F" />
+        <circle cx="263" cy="288" r="8" fill="#0A1A2F" />
+        <circle cx="218" cy="289" r="3.2" fill="#FFFFFF" />
+        <circle cx="266" cy="285" r="2.7" fill="#FFFFFF" />
+        <path d="M239 297 L251 313 L227 313 Z" fill="#0A1A2F" />
+        <path d="M176 322 C202 372 290 368 312 316 C288 346 198 350 176 322 Z" fill="#0A1A2F" />
+        <path d="M228 348 C238 364 258 362 266 346 Z" fill="#8FD6E8" />
+      </g>
     </g>
 
     <!-- ワードマーク: 台形パネル内の左下に白で(iC はアウトライン=Suica の ic と同じ処理) -->
