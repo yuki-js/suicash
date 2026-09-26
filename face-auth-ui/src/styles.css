@@ -788,6 +788,346 @@ body {
   font-style: italic;
 }
 
+/* ===== 決済端末: 待機画面 ===== */
+
+.waiting {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.waiting__badge {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 6px 16px;
+}
+
+.waiting__badge--pay {
+  color: #04101f;
+  background: var(--aqua);
+  border-color: var(--aqua);
+}
+
+.waiting__mark {
+  position: relative;
+  width: 156px;
+  height: 156px;
+}
+
+.waiting__ringSvg {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.waiting__ring {
+  fill: none;
+  stroke: rgba(77, 162, 255, 0.35);
+  stroke-width: 3;
+  animation: pulsering 2s ease-out infinite;
+  transform-origin: 60px 60px;
+}
+
+@keyframes pulsering {
+  0% { transform: scale(0.9); opacity: 0.9; }
+  100% { transform: scale(1.1); opacity: 0.2; }
+}
+
+/* SuiCash カード券面。リングの中央に少し傾けて重ねる */
+.waiting__cardArt {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 124px;
+  height: 78px;
+  margin-left: -62px;
+  margin-top: -39px;
+  transform: rotate(-6deg);
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+}
+
+.waiting__title {
+  font-size: 26px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.waiting__sub {
+  font-size: 13px;
+  color: var(--ink-dim);
+  margin: 0;
+}
+
+/* ===== 顔キャプチャの見出し ===== */
+
+.capture__head {
+  text-align: center;
+}
+
+.capture__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+/* ===== 残高照会 ===== */
+
+.balanceView {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.balanceView__icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 900;
+  background: rgba(46, 204, 143, 0.15);
+  color: var(--ok);
+  box-shadow: 0 0 32px rgba(46, 204, 143, 0.3);
+  animation: pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.balanceView__title {
+  font-size: 18px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.balanceView__card {
+  background: var(--navy-2);
+  border-radius: var(--radius);
+  padding: 18px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.balanceView__label {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.balanceView__value {
+  font-size: 38px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.balanceView__value small {
+  font-size: 15px;
+  color: var(--aqua);
+}
+
+.balanceView__hint,
+.lcd__hint {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+/* ===== 未登録案内 ===== */
+
+.registerPrompt {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+  padding: 0 8px;
+}
+
+.registerPrompt__icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 900;
+  background: rgba(255, 191, 71, 0.15);
+  color: var(--warn);
+}
+
+.registerPrompt__title {
+  font-size: 20px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.registerPrompt__sub {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink-dim);
+  max-width: 320px;
+  margin: 0;
+}
+
+.registerPrompt__url {
+  font-weight: 700;
+  color: var(--aqua);
+  border: 1px dashed var(--aqua-dim);
+  border-radius: 8px;
+  padding: 8px 16px;
+}
+
+/* ===== 改札 LCD 風 決済結果 ===== */
+
+.lcd {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.lcd__panel {
+  width: 100%;
+  max-width: 380px;
+  background: #0b3d12; /* 改札の緑地 LCD */
+  color: #eafff0;
+  border-radius: 10px;
+  border: 3px solid #06260b;
+  padding: 18px 20px;
+  font-family: "DSEG7", "Consolas", "SF Mono", monospace;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.5);
+}
+
+.lcd--ng .lcd__panel {
+  background: #4a1010;
+  border-color: #2a0808;
+  color: #ffe4e4;
+}
+
+.lcd__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 8px;
+}
+
+.lcd__mark {
+  font-size: 24px;
+}
+
+.lcd__mid {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 0 6px;
+}
+
+.lcd__mid--error {
+  justify-content: center;
+}
+
+.lcd__amountLabel {
+  font-size: 16px;
+  opacity: 0.85;
+}
+
+.lcd__amount {
+  font-size: 52px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.lcd__errText {
+  font-size: 16px;
+  text-align: center;
+  padding: 10px 0;
+}
+
+.lcd__unit {
+  font-size: 18px;
+  margin-left: 6px;
+}
+
+.lcd__unit--sm {
+  font-size: 13px;
+}
+
+.lcd__bottom {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  padding-top: 8px;
+}
+
+.lcd__balLabel {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.lcd__bal {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== デバッグパネル(母艦シミュレータ) ===== */
+
+.debugPanel {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.debugPanel__label {
+  font-size: 10.5px;
+  color: var(--warn);
+  font-weight: 700;
+}
+
+.debugPanel__row {
+  display: flex;
+  gap: 6px;
+}
+
+.debugPanel__row button {
+  flex: 1;
+  font-size: 11px;
+  padding: 7px 4px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--navy-3);
+  color: var(--ink);
+  cursor: pointer;
+}
+
 /* 幅の広い画面では端末風に浮かせる */
 
 @media (min-width: 520px) {

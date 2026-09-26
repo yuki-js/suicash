@@ -1,367 +1,250 @@
-import { useCallback, useEffect, useState } from "react";
-import { CameraView } from "./components/CameraView";
-import { QualityMeter } from "./components/QualityMeter";
-import { ResultView } from "./components/ResultView";
-import { LogPanel, type LogEntry } from "./components/LogPanel";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "./components/Logo";
-import { initialControl, onControlMessage } from "./control";
+import { LogPanel, type LogEntry } from "./components/LogPanel";
+import { WaitingScreen } from "./components/WaitingScreen";
+import { RegisterPrompt } from "./components/RegisterPrompt";
+import { FaceCapture } from "./components/FaceCapture";
+import { BalanceInquiry } from "./components/BalanceInquiry";
+import { GateLcd } from "./components/GateLcd";
 import { createEngine } from "./engine";
-import type { OpMode } from "./types";
-import {
-  MockSafrEngine,
-  QUALITY_GATE,
-  type DetectedFace,
-  type RecognizeResult,
-} from "./sim";
+import { DEFAULT_THRESHOLD } from "./sim";
+import { subscribe, report, type TerminalEvent } from "./terminal";
 
-type Screen = "home" | "camera" | "processing" | "result" | "unlocked";
-type FlowMode = "register" | "verify";
+/**
+ * 決済端末(Hi-CARA)の UI 状態機械。
+ *
+ * 母艦(PC)が FeliCa を読み、オラクルで IDi を認証し、オンチェーン決済まで担う。
+ * 端末は母艦からのイベント(card / mode / paymentResult)で画面を切り替える:
+ *
+ *   waiting(カード待ち)
+ *     └ card → 未登録: registerPrompt
+ *             登録済み & 端末に顔なし: enroll(顔登録)→ 認証済み扱いで次へ
+ *             登録済み & 顔あり:       auth(顔認証)
+ *        └ 顔OK → 待機モード: balance(残高照会) / 決済モード: paying → gateLcd
+ *
+ * 顔は端末内に保持(IDi キー、セッション内)。実際の顔照合は端末内で完結し、
+ * 顔データは端末の外へ出ない(ZKP はローカルのみ)。
+ */
 
-const PROBE_MS = 300; // プレビュー中の probe(検出のみ)間隔
-const STABLE_FRAMES = 5; // 品質ゲートをこの回数連続で通ると自動キャプチャ(約1.5秒)
+type Card = { idi: string; registered: boolean; balance: string };
+type PayMode = { amount: string } | null;
+type Screen =
+  | "waiting"
+  | "detecting"
+  | "registerPrompt"
+  | "enroll"
+  | "auth"
+  | "balance"
+  | "paying"
+  | "lcd";
 
-const initial = initialControl();
+const DEBUG = new URLSearchParams(window.location.search).get("debug") === "1";
 
 export default function App() {
-  // createEngine は一度だけ呼ぶこと。NativeEngine は window.__safrResolve を
-  // 自分の pending マップに向けるため、再レンダーで作り直すと応答が迷子になる。
   const [engine] = useState(createEngine);
-  const [opMode, setOpMode] = useState<OpMode>(initial.mode);
-  const [threshold, setThreshold] = useState(initial.threshold);
-  const [screen, setScreen] = useState<Screen>("home");
-  const [flow, setFlow] = useState<FlowMode>("verify");
-  const [face, setFace] = useState<DetectedFace | null>(null);
-  const [result, setResult] = useState<RecognizeResult | null>(null);
   const [engineReady, setEngineReady] = useState(engine.kind === "mock");
-  const [registered, setRegistered] = useState(false);
-  const [stable, setStable] = useState(0);
+  const [payMode, setPayMode] = useState<PayMode>(null);
+  const [screen, setScreen] = useState<Screen>("waiting");
+  const [card, setCard] = useState<Card | null>(null);
+  const [lcd, setLcd] = useState<{ ok: boolean; amount: string; balanceAfter: string; error?: string } | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logOpen, setLogOpen] = useState(false);
+
+  /** 端末内に顔を登録済みの IDi(セッション内)。SAFR ストアは1名なので直近1件を追跡 */
+  const enrolledIdi = useRef<string | null>(null);
 
   const log = useCallback((text: string) => {
     const time = new Date().toLocaleTimeString("ja-JP", { hour12: false });
     setLogs((prev) => [...prev.slice(-199), { time, text }]);
   }, []);
 
-  // エンジン状態のポーリング(SAFR は初期化に数十秒かかることがある)
+  // エンジン初期化待ち(SAFR は数十秒)
   useEffect(() => {
     log(`engine: ${engine.kind}`);
-    let stopped = false;
+    let stop = false;
     const tick = async () => {
       const s = await engine.status();
-      if (stopped) return;
-      setEngineReady((prev) => {
-        if (!prev && s.ready) log("エンジン初期化完了");
-        return s.ready;
-      });
-      setRegistered(s.registered);
+      if (!stop) setEngineReady((prev) => (prev || s.ready));
     };
     tick();
     const id = window.setInterval(tick, 2000);
     return () => {
-      stopped = true;
+      stop = true;
       window.clearInterval(id);
     };
-  }, [log]);
+  }, [engine, log]);
 
-  // 母艦 CLI からの制御コマンド(モード切替・閾値・store 消去)
+  const goWaiting = useCallback(() => {
+    setScreen("waiting");
+    setCard(null);
+    setLcd(null);
+  }, []);
+
+  // 母艦イベントの購読
   useEffect(() => {
-    return onControlMessage((c) => {
-      switch (c.cmd) {
+    return subscribe((e: TerminalEvent) => {
+      switch (e.type) {
+        case "detecting":
+          // カード検出の即時反応(認証はこの後)。既に処理中の画面なら維持
+          setScreen((s) => (s === "waiting" ? "detecting" : s));
+          break;
         case "mode":
-          setOpMode(c.value);
-          setScreen("home");
-          setResult(null);
-          setFace(null);
-          log(`facectl: mode ${c.value}`);
+          setPayMode(e.payment);
+          log(`母艦: ${e.payment ? `決済待機 ${e.payment.amount} MIST` : "残高照会モード"}`);
           break;
-        case "threshold":
-          setThreshold(c.value);
-          log(`facectl: threshold ${c.value.toFixed(2)}`);
+        case "card": {
+          log(`card idi=${e.idi} registered=${e.registered} bal=${e.balance}`);
+          const c = { idi: e.idi, registered: e.registered, balance: e.balance };
+          setCard(c);
+          if (!c.registered) {
+            setScreen("registerPrompt");
+          } else if (enrolledIdi.current !== c.idi) {
+            setScreen("enroll"); // オンチェーン登録あり + 端末に顔なし → 顔登録
+          } else {
+            setScreen("auth");
+          }
           break;
-        case "store.clear":
-          engine.clearStore().then(() => {
-            setRegistered(false);
-            log("facectl: store.clear");
-          });
+        }
+        case "cardRemoved":
+          log("card removed");
+          goWaiting();
+          break;
+        case "paymentResult":
+          log(`payment ok=${e.ok} amount=${e.amount} after=${e.balanceAfter} ${e.digest ?? e.error ?? ""}`);
+          setLcd({ ok: e.ok, amount: e.amount, balanceAfter: e.balanceAfter, error: e.error });
+          setScreen("lcd");
           break;
       }
     });
-  }, [log]);
+  }, [log, goWaiting]);
 
-  // カメラ画面に入ったらネイティブカメラを起動、出たら停止
-  useEffect(() => {
-    if (screen !== "camera") return;
-    engine.cameraStart();
-    return () => {
-      engine.cameraStop();
-    };
-  }, [screen, engine]);
-
-  // カメラ画面中の検出ループ(probe)。応答待ちの間は次を出さない
-  useEffect(() => {
-    if (screen !== "camera") return;
-    let stopped = false;
-    let busy = false;
-    const id = window.setInterval(async () => {
-      if (busy || stopped) return;
-      busy = true;
-      try {
-        const f = await engine.probe();
-        if (!stopped) {
-          setFace(f);
-          setStable((s) => (f && MockSafrEngine.passesGate(f) ? s + 1 : 0));
-        }
-      } finally {
-        busy = false;
+  // 顔OK後の分岐: 待機=残高照会 / 決済=送金依頼
+  const onFaceResult = useCallback(
+    (ok: boolean, _conf: number | null, mode: "enroll" | "auth") => {
+      if (!card) return;
+      if (!ok) {
+        report({ type: "faceNg", idi: card.idi });
+        log("顔認証NG");
+        // NG は待機へ戻す(実運用はリトライ導線でもよい)
+        goWaiting();
+        return;
       }
-    }, PROBE_MS);
-    return () => {
-      stopped = true;
-      window.clearInterval(id);
-    };
-  }, [screen, engine]);
-
-  const capture = useCallback(async () => {
-    setScreen("processing");
-    log(flow === "register" ? "register 実行" : "recognize 実行");
-    const started = Date.now();
-    let r: RecognizeResult;
-    if (flow === "register") {
-      r = await engine.register();
-      const s = await engine.status();
-      setRegistered(s.registered);
-      log(`register → code=${r.code}`);
-    } else {
-      r = await engine.recognize(threshold);
-      log(
-        `recognize → code=${r.code}` +
-          (r.face ? ` confidence=${r.face.confidence.toFixed(3)}` : ""),
-      );
-    }
-    // 結果画面が一瞬で切り替わらないよう最低表示時間を確保
-    const wait = Math.max(0, 600 - (Date.now() - started));
-    window.setTimeout(() => {
-      setResult(r);
-      setScreen("result");
-    }, wait);
-  }, [flow, threshold, log, engine]);
-
-  // 品質ゲートを一定時間維持したら自動キャプチャ
-  useEffect(() => {
-    if (screen === "camera" && stable >= STABLE_FRAMES) {
-      setStable(0);
-      capture();
-    }
-  }, [screen, stable, capture]);
-
-  const startCamera = (m: FlowMode) => {
-    setFlow(m);
-    setFace(null);
-    setStable(0);
-    setScreen("camera");
-    log(m === "register" ? "登録フロー開始" : "照合フロー開始");
-  };
-
-  const goHome = () => {
-    setScreen("home");
-    setResult(null);
-    setFace(null);
-  };
-
-  const gateOk = face !== null && MockSafrEngine.passesGate(face);
-  const hint = !face
-    ? "顔をワクの中に合わせてください"
-    : !gateOk
-      ? face.mask >= QUALITY_GATE.mask
-        ? "マスクを外してください"
-        : "明るい場所で、正面を向いてください"
-      : stable > 0
-        ? `そのままお待ちください… ${Math.min(100, Math.round((stable / STABLE_FRAMES) * 100))}%`
-        : "顔を検出しました";
+      if (mode === "enroll") {
+        enrolledIdi.current = card.idi;
+        report({ type: "enrolled", idi: card.idi });
+      }
+      report({ type: "faceOk", idi: card.idi });
+      if (payMode) {
+        // 母艦が送金を実行 → paymentResult を待つ
+        setScreen("paying");
+      } else {
+        setScreen("balance"); // 待機モード: 残高照会のみ
+      }
+    },
+    [card, payMode, log, goWaiting],
+  );
 
   return (
-    <div className="app">
+    <div className="app app--terminal">
       <header className="app__header">
         <Logo inverted />
-        <span className="app__headerTag">顔認証</span>
-        {opMode === "enroll" && <span className="app__badge app__badge--enroll">登録モード</span>}
+        <span className="app__headerTag">決済端末</span>
+        {!engineReady && <span className="app__badge app__badge--enroll">エンジン初期化中</span>}
       </header>
 
-      {opMode === "enroll" && screen === "home" && (
-        <div className="modeBanner">
-          係員操作中:顔登録モードです。切替は母艦 CLI から行います。
-        </div>
-      )}
-
       <main className="app__main">
-        {screen === "home" && opMode === "normal" && (
-          <div className="home">
-            <div className="home__hero">
-              <div className="home__faceMark" aria-hidden="true">
-                <svg viewBox="0 0 96 96">
-                  <rect x="6" y="6" width="20" height="6" rx="3" />
-                  <rect x="6" y="6" width="6" height="20" rx="3" />
-                  <rect x="70" y="6" width="20" height="6" rx="3" />
-                  <rect x="84" y="6" width="6" height="20" rx="3" />
-                  <rect x="6" y="84" width="20" height="6" rx="3" />
-                  <rect x="6" y="70" width="6" height="20" rx="3" />
-                  <rect x="70" y="84" width="20" height="6" rx="3" />
-                  <rect x="84" y="70" width="6" height="20" rx="3" />
-                  <ellipse cx="48" cy="42" rx="15" ry="18" className="home__faceHead" />
-                  <path d="M26 88 C26 70 36 63 48 63 C60 63 70 70 70 88 Z" className="home__faceHead" />
-                </svg>
-              </div>
-              <h1>顔でウォレットを開く</h1>
-              <p>
-                顔認証はこの端末の中だけで行われます。
-                顔の画像やデータが端末の外へ保存・送信されることはありません。
-              </p>
-            </div>
+        {screen === "waiting" && <WaitingScreen payment={payMode} />}
 
-            <div className="home__actions">
-              <button
-                className="btn btn--primary btn--big"
-                disabled={!engineReady}
-                onClick={() => startCamera("verify")}
-              >
-                {engineReady ? "顔で認証する" : "エンジン初期化中…"}
-              </button>
-            </div>
-
-            <p className="home__note">
-              顔の登録がお済みでない方は、係員にお声がけください。
-            </p>
-          </div>
-        )}
-
-        {screen === "home" && opMode === "enroll" && (
-          <div className="home">
-            <div className="home__hero">
-              <div className="home__faceMark home__faceMark--enroll" aria-hidden="true">
-                <svg viewBox="0 0 96 96">
-                  <ellipse cx="48" cy="42" rx="15" ry="18" className="home__faceHead" />
-                  <path d="M26 88 C26 70 36 63 48 63 C60 63 70 70 70 88 Z" className="home__faceHead" />
-                  <g className="home__plus">
-                    <rect x="66" y="14" width="20" height="6" rx="3" />
-                    <rect x="73" y="7" width="6" height="20" rx="3" />
-                  </g>
-                </svg>
-              </div>
-              <h1>顔を登録する</h1>
-              <p>
-                利用者の顔を撮影してこの端末に登録します。
-                登録データは端末メモリ内のみに保持され、アプリ終了で消えます。
-                端末の外へ送信されることはありません。
-              </p>
-            </div>
-
-            <div className="home__actions">
-              <button
-                className="btn btn--primary btn--big"
-                disabled={!engineReady}
-                onClick={() => startCamera("register")}
-              >
-                {engineReady ? "撮影して登録" : "エンジン初期化中…"}
-              </button>
-              <button
-                className="btn btn--outline btn--big"
-                disabled={!engineReady || !registered}
-                onClick={() => startCamera("verify")}
-              >
-                登録した顔で確認照合
-              </button>
-            </div>
-
-            <div className="enrollStatus">
-              <span>engine {engine.kind}{engineReady ? "" : "(初期化中)"}</span>
-              <span className={registered ? "enrollStatus--ok" : ""}>
-                {registered ? "1 件登録済み" : "未登録"}
-              </span>
-              <span>閾値 {threshold.toFixed(2)}</span>
-            </div>
-          </div>
-        )}
-
-        {screen === "camera" && (
-          <div className="capture">
-            <CameraView
-              face={face}
-              gateOk={gateOk}
-              hint={hint}
-              nativePreview={engine.kind === "safr"}
-            />
-            <div className="capture__meters">
-              <QualityMeter label="姿勢 (cpq)" value={face?.centerPoseQuality ?? null} gate={QUALITY_GATE.cpq} />
-              <QualityMeter label="コントラスト" value={face?.contrastQuality ?? null} gate={QUALITY_GATE.contrast} />
-              <QualityMeter label="鮮明さ" value={face?.sharpnessQuality ?? null} gate={QUALITY_GATE.sharpness} />
-              <QualityMeter label="マスク" value={face?.mask ?? null} gate={QUALITY_GATE.mask} invert />
-            </div>
-            <div className="capture__actions">
-              <button className="btn btn--primary" disabled={!gateOk} onClick={() => capture()}>
-                {flow === "register" ? "この顔を登録" : "この顔で照合"}
-              </button>
-              <button className="btn btn--ghost" onClick={goHome}>キャンセル</button>
-            </div>
-          </div>
-        )}
-
-        {screen === "processing" && (
+        {screen === "detecting" && (
           <div className="processing">
             <div className="processing__spinner" />
-            <p>{flow === "register" ? "顔を登録しています…" : "照合しています…"}</p>
+            <p>カードを認証しています…</p>
           </div>
         )}
 
-        {screen === "result" && result && (
-          <ResultView
-            mode={flow}
-            result={result}
-            threshold={threshold}
-            showUnlock={opMode === "normal"}
-            onRetry={() => startCamera(flow)}
-            onHome={goHome}
-            onUnlock={() => {
-              log("端末内で顔認証成立 → ウォレットをアンロック(モック)");
-              setScreen("unlocked");
+        {screen === "registerPrompt" && <RegisterPrompt onDone={goWaiting} />}
+
+        {screen === "enroll" && card && (
+          <FaceCapture
+            engine={engine}
+            mode="enroll"
+            threshold={DEFAULT_THRESHOLD}
+            onResult={(ok, conf) => onFaceResult(ok, conf, "enroll")}
+            onCancel={() => {
+              report({ type: "cancel", idi: card.idi });
+              goWaiting();
             }}
+            log={log}
           />
         )}
 
-        {screen === "unlocked" && (
-          <div className="unlocked">
-            <div className="unlocked__ring">
-              <svg viewBox="0 0 48 48" aria-hidden="true">
-                <path d="M14 22 v-6 a10 10 0 0 1 20 0 v6" fill="none" strokeWidth="4" strokeLinecap="round" className="unlocked__shackle" />
-                <rect x="10" y="22" width="28" height="20" rx="5" className="unlocked__body" />
-              </svg>
-            </div>
-            <h2>ウォレットをアンロックしました</h2>
-            <p className="unlocked__sub">
-              顔認証は端末内で完結し、顔データは外部へ送信されていません。
-              残高照会・チャージ・送金が利用できます。
-            </p>
-            <div className="unlocked__balance">
-              <span className="unlocked__balanceLabel">残高(デモ)</span>
-              <span className="unlocked__balanceValue">1,250 <small>SUI</small></span>
-            </div>
-            <div className="result__actions">
-              <button className="btn btn--primary" onClick={goHome}>ホームへ戻る</button>
-            </div>
+        {screen === "auth" && card && (
+          <FaceCapture
+            engine={engine}
+            mode="auth"
+            threshold={DEFAULT_THRESHOLD}
+            onResult={(ok, conf) => onFaceResult(ok, conf, "auth")}
+            onCancel={() => {
+              report({ type: "cancel", idi: card.idi });
+              goWaiting();
+            }}
+            log={log}
+          />
+        )}
+
+        {screen === "balance" && card && (
+          <BalanceInquiry balance={card.balance} onDone={goWaiting} />
+        )}
+
+        {screen === "paying" && (
+          <div className="processing">
+            <div className="processing__spinner" />
+            <p>決済しています…</p>
           </div>
+        )}
+
+        {screen === "lcd" && lcd && (
+          <GateLcd
+            ok={lcd.ok}
+            amount={lcd.amount}
+            balanceAfter={lcd.balanceAfter}
+            error={lcd.error}
+            onDone={goWaiting}
+          />
         )}
       </main>
 
-      {initial.debug && (
-        <LogPanel entries={logs} open={logOpen} onToggle={() => setLogOpen((o) => !o)} />
-      )}
+      {DEBUG && <DebugPanel />}
+      {DEBUG && <LogPanel entries={logs} open={logOpen} onToggle={() => setLogOpen((o) => !o)} />}
 
       <footer className="app__footer">
-        <span>
-          SuiCash face-auth UI — engine: {engine.kind}
-          {engine.kind === "mock" ? "(実エンジン未接続)" : ""}
-        </span>
+        SuiCash 決済端末 — engine: {engine.kind}
+        {engine.kind === "mock" ? "(実エンジン未接続)" : ""}
       </footer>
+    </div>
+  );
+}
+
+/** ?debug=1 のときだけ出る、母艦イベントを手で流すデバッグパネル(ブラウザ検証用) */
+function DebugPanel() {
+  const emit = (event: TerminalEvent) =>
+    window.postMessage({ source: "suicash-facepay", event }, "*");
+  const demoIdi = "05d5807e28260205";
+  return (
+    <div className="debugPanel">
+      <span className="debugPanel__label">DEBUG 母艦シミュレータ</span>
+      <div className="debugPanel__row">
+        <button onClick={() => emit({ type: "mode", payment: null })}>残高照会モード</button>
+        <button onClick={() => emit({ type: "mode", payment: { amount: "300000000" } })}>決済待機 0.3</button>
+      </div>
+      <div className="debugPanel__row">
+        <button onClick={() => emit({ type: "card", idi: demoIdi, registered: true, balance: "1000000000" })}>登録済みカード</button>
+        <button onClick={() => emit({ type: "card", idi: "ffffffffffffffff", registered: false, balance: "0" })}>未登録カード</button>
+      </div>
+      <div className="debugPanel__row">
+        <button onClick={() => emit({ type: "paymentResult", ok: true, amount: "300000000", balanceAfter: "700000000", digest: "DEMO" })}>決済成功</button>
+        <button onClick={() => emit({ type: "cardRemoved" })}>カード離す</button>
+      </div>
     </div>
   );
 }
