@@ -24,6 +24,13 @@ struct JsonlRecord {
     node: String,
     algo: String,
     /// Key-set version; only `"0000"` (DES) is supported.
+    ///
+    /// Parsed but NOT validated: the check was commented out in 17bd2c0 so that
+    /// records using another version string are accepted. The field is kept and
+    /// still required here so `keys.jsonl` keeps its documented shape, and the
+    /// value is surfaced by [`warn_unsupported_version`] rather than dropped
+    /// silently. Restoring the hard rejection is a one-line change; see
+    /// `parse_key`.
     version: String,
     #[serde(default)]
     idm: Option<String>,
@@ -57,6 +64,21 @@ fn parse_hex_u16(label: &str, s: &str) -> Result<u16, String> {
     u16::from_str_radix(digits, 16).map_err(|_| format!("{label}: not hex u16: {s:?}"))
 }
 
+/// Surface a non-`"0000"` key-set version on stderr without rejecting it.
+///
+/// The provisioning wizard already echoes secrets to the terminal, so a
+/// warning here does not widen that exposure, and this tool is run offline
+/// during provisioning.
+fn warn_unsupported_version(label: &str, version: &str) {
+    if version != "0000" {
+        eprintln!(
+            "felica-keys: warning: {label}: key version {version:?} is not \
+             \"0000\" (the DES key set); accepting it anyway — verify this \
+             record matches the card's key derivation"
+        );
+    }
+}
+
 fn parse_key(label: &str, rec: &JsonlRecord) -> Result<[u8; 8], String> {
     if !rec.algo.eq_ignore_ascii_case("DES") {
         return Err(format!(
@@ -64,16 +86,23 @@ fn parse_key(label: &str, rec: &JsonlRecord) -> Result<[u8; 8], String> {
             rec.algo
         ));
     }
-    // `version` is `"0000"` for the DES key set this oracle serves. Validate
-    // it rather than parsing-and-ignoring: a record written for a different
-    // key derivation would otherwise be accepted silently and produce an
-    // oracle that cannot authenticate anything.
-    // if rec.version != "0000" {
-    //     return Err(format!(
-    //         "{label}: unsupported key version {:?} (expected \"0000\")",
-    //         rec.version
-    //     ));
-    // }
+    // `version` is `"0000"` for the DES key set this oracle serves.
+    //
+    // The hard rejection here was commented out in 17bd2c0 ("キーのバージョンチェックを
+    // コメントアウト") so records carrying another version string are accepted. Rejecting
+    // is the safer default: a record written for a different key derivation
+    // would otherwise be accepted silently and produce an oracle that cannot
+    // authenticate anything. Since it is no longer enforced, the value is at
+    // least surfaced rather than parsed and forgotten — see
+    // [`warn_unsupported_version`].
+    warn_unsupported_version(label, &rec.version);
+    // Restore strictness with:
+    //   if rec.version != "0000" {
+    //       return Err(format!(
+    //           "{label}: unsupported key version {:?} (expected \"0000\")",
+    //           rec.version
+    //       ));
+    //   }
     // `idm` must be null (None after deserialization) — this oracle serves a
     // single card chain.
     if rec.idm.is_some() {
