@@ -2,9 +2,9 @@
   <title>SuiCash カード</title>
   <style><![CDATA[@import url('https://fonts.googleapis.com/css2?family=REM:wght@100..900&display=block');]]></style>
   <defs>
-    <linearGradient id="scGreen" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#40c23b" />
-      <stop offset="1" stop-color="#2f9e2f" />
+    <linearGradient id="scSilver" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f8f9f8" />
+      <stop offset="1" stop-color="#e2e6e4" />
     </linearGradient>
     <linearGradient id="scAqua" x1="0" y1="0" x2="0.5" y2="1">
       <stop offset="0" stop-color="#5cb0ff" />
@@ -16,60 +16,49 @@
   </defs>
 
   <g clip-path="url(#scCardClip)">
-    <!-- 緑地(交通系カード風) -->
-    <rect x="0" y="0" width="172" height="108" fill="url(#scGreen)" />
+    <!-- シルバー下地(交通系カードの地色) -->
+    <rect x="0" y="0" width="172" height="108" fill="url(#scSilver)" />
 
-    <!-- 左の台形パネル(SuiCash テーマカラーのアクア) -->
-    <polygon points="0,0 98,0 66,108 0,108" fill="url(#scAqua)" />
+    <!-- 台形パネル(Suica 券面の台形をトレス。色は SuiCash テーマのアクア) -->
+    <path d="M 12 7 H 76 Q 80 7 81.2 10.8 L 108.8 98.2 Q 110 102 106 102 H 12 Q 7 102 7 97 V 12 Q 7 7 12 7 Z" fill="url(#scAqua)" />
+
+    <!-- 左上の挿入方向マーク(交通系カードの意匠) -->
+    <path d="M 15 2.2 L 10.4 4.3 L 15 6.4 Z" fill="#0a1a2f" opacity="0.7" />
 
     <!-- 右上の IC マーク(汎用・非ブランド) -->
-    <g opacity="0.9">
-      <rect x="146" y="9" width="17" height="11" rx="2.2" fill="none" stroke="#ffffff" stroke-width="1.1" />
-      <text x="154.5" y="17.6" text-anchor="middle" font-family="REM, sans-serif" font-weight="700" font-size="7.2" fill="#ffffff">IC</text>
+    <g opacity="0.85">
+      <rect x="146" y="8" width="17" height="11" rx="2.2" fill="none" stroke="#0a1a2f" stroke-width="1.1" />
+      <text x="154.5" y="16.6" text-anchor="middle" font-family="REM, sans-serif" font-weight="700" font-size="7.2" fill="#0a1a2f">IC</text>
     </g>
 
-    <!-- マスコットの背後に白い当て板(緑と同化させないため) -->
-    <ellipse cx="136" cy="74" rx="31" ry="33" fill="#ffffff" opacity="0.92" />
-
-    <!-- マスコット(SuiCash オリジナル)。右下にペンギン位置で配置 -->
-    <g transform="translate(103.4 37.5) scale(0.131)">
-      <g fill="none" stroke-linecap="round">
-        <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" stroke-width="78" />
-        <path d="M318 204 C340 164 366 130 396 112" stroke="#0A1A2F" stroke-width="62" />
-        <path d="M198 206 C180 150 162 92 158 46" stroke="#4DA2FF" stroke-width="64" />
-        <path d="M318 204 C340 164 366 130 396 112" stroke="#4DA2FF" stroke-width="48" />
+    <!-- マスコット(SuiCash オリジナル)。ペンギン位置にらくがき風で -->
+    <g transform="translate(122 42) scale(0.34)">
+      <!-- 触手あし -->
+      <g fill="none" stroke="#0a1a2f" stroke-width="6" stroke-linecap="round">
+        <path d="M 34 132 C 32 140 30 145 25 149" />
+        <path d="M 50 133 C 50 141 50 146 50 150" />
+        <path d="M 66 132 C 68 140 70 145 75 149" />
       </g>
-      <g fill="none" stroke-linecap="round">
-        <path d="M148 330 C142 382 138 414 137 442" stroke="#0A1A2F" stroke-width="50" />
-        <path d="M222 330 C219 372 216 404 215 428" stroke="#0A1A2F" stroke-width="44" />
-        <path d="M296 330 C300 368 302 398 303 418" stroke="#0A1A2F" stroke-width="44" />
-        <path d="M364 330 C370 382 374 414 375 442" stroke="#0A1A2F" stroke-width="50" />
-        <path d="M137 438 L104 482 M137 438 L137 492 M137 438 L170 482" stroke="#0A1A2F" stroke-width="36" />
-        <path d="M375 438 L342 482 M375 438 L375 492 M375 438 L408 482" stroke="#0A1A2F" stroke-width="36" />
-        <path d="M148 330 C142 382 138 414 137 442" stroke="#4DA2FF" stroke-width="38" />
-        <path d="M222 330 C219 372 216 404 215 428" stroke="#4DA2FF" stroke-width="32" />
-        <path d="M296 330 C300 368 302 398 303 418" stroke="#4DA2FF" stroke-width="32" />
-        <path d="M364 330 C370 382 374 414 375 442" stroke="#4DA2FF" stroke-width="38" />
-        <path d="M137 438 L104 482 M137 438 L137 492 M137 438 L170 482" stroke="#4DA2FF" stroke-width="24" />
-        <path d="M375 438 L342 482 M375 438 L375 492 M375 438 L408 482" stroke="#4DA2FF" stroke-width="24" />
+      <!-- ひれ -->
+      <g fill="#4DA2FF" stroke="#0a1a2f" stroke-width="6" stroke-linejoin="round">
+        <path d="M 15 64 C 3 56 -1 42 6 32 C 13 40 19 52 22 60 Z" />
+        <path d="M 85 64 C 97 70 101 84 95 94 C 88 86 82 74 80 68 Z" />
       </g>
-      <g stroke="#0A1A2F" stroke-width="10" stroke-linejoin="round">
-        <path fill="#4DA2FF" d="M272 124 C358 128 424 174 432 246 C438 304 402 348 342 366 C276 386 134 392 100 354 C66 316 78 256 108 214 C144 164 202 122 272 124 Z" />
-        <path fill="#FFFFFF" d="M236 250 C284 248 312 270 314 302 C316 334 294 356 252 360 C208 364 174 348 170 318 C166 286 190 252 236 250 Z" />
-      </g>
-      <g>
-        <circle cx="215" cy="292" r="9.5" fill="#0A1A2F" />
-        <circle cx="263" cy="288" r="8" fill="#0A1A2F" />
-        <circle cx="218" cy="289" r="3.2" fill="#FFFFFF" />
-        <circle cx="266" cy="285" r="2.7" fill="#FFFFFF" />
-        <path d="M239 297 L251 313 L227 313 Z" fill="#0A1A2F" />
-        <path d="M176 322 C202 372 290 368 312 316 C288 346 198 350 176 322 Z" fill="#0A1A2F" />
-        <path d="M228 348 C238 364 258 362 266 346 Z" fill="#8FD6E8" />
-      </g>
+      <!-- 胴体 -->
+      <path d="M 50 10 C 74 10 88 30 87 60 C 86 84 83 102 79 118 C 76 128 68 132 50 132 C 32 132 24 128 21 118 C 17 102 14 84 13 60 C 12 30 26 10 50 10 Z" fill="#4DA2FF" stroke="#0a1a2f" stroke-width="6" stroke-linejoin="round" />
+      <!-- おなか -->
+      <path d="M 50 56 C 65 56 73 72 72 92 C 71 110 63 120 50 120 C 37 120 29 110 28 92 C 27 72 35 56 50 56 Z" fill="#ffffff" />
+      <!-- かお -->
+      <circle cx="37" cy="40" r="5.5" fill="#0a1a2f" />
+      <circle cx="63" cy="40" r="5.5" fill="#0a1a2f" />
+      <circle cx="38.5" cy="38.5" r="2" fill="#ffffff" />
+      <circle cx="64.5" cy="38.5" r="2" fill="#ffffff" />
+      <path d="M 45 48 L 55 48 L 50 56 Z" fill="#0a1a2f" />
+      <path d="M 32 64 C 40 71 60 71 68 64" fill="none" stroke="#0a1a2f" stroke-width="3.5" stroke-linecap="round" />
     </g>
 
-    <!-- ワードマーク: 左下に白で大きく(iC は濃紺アクセント) -->
-    <text x="11" y="95" font-family="REM, sans-serif" font-weight="605" font-size="27" font-kerning="none" style="font-variation-settings:'wght' 605;font-variant-ligatures:none"><tspan fill="#ffffff" stroke="#0a1a2f" stroke-width="0.7" stroke-linejoin="miter">Su</tspan><tspan fill="#0a1a2f" stroke="#ffffff" stroke-width="1.1" stroke-linejoin="miter">iC</tspan><tspan fill="#ffffff" stroke="#0a1a2f" stroke-width="0.7" stroke-linejoin="miter">ash</tspan></text>
+    <!-- ワードマーク: 台形パネル内の左下に白で(iC はアウトライン=Suica の ic と同じ処理) -->
+    <text x="12" y="94" font-family="REM, sans-serif" font-weight="605" font-size="22" font-kerning="none" style="font-variation-settings:'wght' 605;font-variant-ligatures:none"><tspan fill="#ffffff">Su</tspan><tspan fill="none" stroke="#ffffff" stroke-width="1" stroke-linejoin="miter">iC</tspan><tspan fill="#ffffff">ash</tspan></text>
   </g>
 
   <rect x="0.75" y="0.75" width="170.5" height="106.5" rx="8.5" fill="none" stroke="rgba(10, 26, 47, 0.28)" stroke-width="1.5" />
