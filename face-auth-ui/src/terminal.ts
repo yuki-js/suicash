@@ -51,6 +51,9 @@ declare global {
   }
 }
 
+/** WS 接続(あれば report もここから送る) */
+let sharedWs: WebSocket | null = null;
+
 /** 母艦イベントを購読する。戻り値は解除関数 */
 export function subscribe(handler: (e: TerminalEvent) => void): () => void {
   const onObj = (d: unknown) => {
@@ -83,12 +86,16 @@ export function subscribe(handler: (e: TerminalEvent) => void): () => void {
     const url = new URLSearchParams(window.location.search).get("ws");
     if (url) {
       ws = new WebSocket(url);
+      sharedWs = ws;
       ws.onmessage = (m) => {
         try {
           onObj(JSON.parse(m.data));
         } catch {
           /* ignore */
         }
+      };
+      ws.onclose = () => {
+        if (sharedWs === ws) sharedWs = null;
       };
     }
   } catch {
@@ -105,6 +112,16 @@ export function subscribe(handler: (e: TerminalEvent) => void): () => void {
 /** 母艦へレポートを送る */
 export function report(msg: TerminalReport): void {
   const json = JSON.stringify(msg);
+  // 1) WebSocket 接続があればそこへ(母艦が WS サーバの構成)
+  try {
+    if (sharedWs && sharedWs.readyState === WebSocket.OPEN) {
+      sharedWs.send(json);
+      return;
+    }
+  } catch {
+    /* fallthrough */
+  }
+  // 2) シェルのネイティブブリッジ
   try {
     if (window.FacePayNative) {
       window.FacePayNative.report(json);
