@@ -193,8 +193,8 @@ fn run(out: &Path, force: bool) -> Result<(), String> {
     }
 
     let (gsk, usk) = generate_service_keys_des(&system_key, &area_keys, &svc_keys);
-    eprintln!("derived k_group (GSK): {}", hex::encode(gsk));
-    eprintln!("derived k_user  (USK): {}", hex::encode(usk));
+    eprintln!("derived gsk (GSK): {}", hex::encode(gsk));
+    eprintln!("derived usk (USK): {}", hex::encode(usk));
 
     let sc = format!("{system_code:04X}");
     let mut jsonl = format!(
@@ -214,7 +214,7 @@ fn run(out: &Path, force: bool) -> Result<(), String> {
         ));
     }
     let json = format!(
-        "{{\"k_group\":\"{}\",\"k_user\":\"{}\",\"system_code\":{},\"areas\":{:?},\"services\":{:?}}}\n",
+        "{{\"gsk\":\"{}\",\"usk\":\"{}\",\"system_code\":{},\"areas\":{:?},\"services\":{:?}}}\n",
         hex::encode(gsk),
         hex::encode(usk),
         system_code,
