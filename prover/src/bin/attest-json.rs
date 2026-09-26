@@ -94,10 +94,13 @@ fn main() {
     );
 }
 
+/// Transcript of one mutual authentication: `(c1b, c2a, auth2, gsk, usk)`.
+type MintTranscript = ([u8; 8], [u8; 8], [u8; 32], [u8; 8], [u8; 8]);
+
 /// One full mutual authentication against the emulated card, with the given
 /// holder challenge. Mirrors `felica-fixture::mint_fixed` but parameterised
 /// over `r1`.
-fn mint(r1: &[u8; 8]) -> ([u8; 8], [u8; 8], [u8; 32], [u8; 8], [u8; 8]) {
+fn mint(r1: &[u8; 8]) -> MintTranscript {
     let (gsk, usk) = generate_service_keys_des(&SYSTEM_KEY, &[AREA_KEY], &[SERVICE_KEY]);
     let mut emusys = EmuSys::new(SYSTEM_CODE, IDM, PMI).expect("system");
     emusys.set_system_key(SYSTEM_KEY);
