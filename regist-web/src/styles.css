@@ -1,0 +1,507 @@
+/* SuiCash 登録サイト — スマホ縦持ち前提のモバイルレイアウト */
+
+:root {
+  --navy: #0a1a2f;
+  --navy-2: #12263f;
+  --navy-3: #1b3355;
+  --aqua: #4da2ff;
+  --aqua-dim: #2f6fb8;
+  --ok: #2ecc8f;
+  --ng: #ff5d6c;
+  --warn: #ffbf47;
+  --ink: #eaf2fb;
+  --ink-dim: #9db3cc;
+  --radius: 14px;
+  --font-ui: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  --font-brand: "REM", var(--font-ui);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #060e1a;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== 全体 ===== */
+
+.app {
+  max-width: 480px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--navy) 0%, #0c1f38 60%, var(--navy) 100%);
+}
+
+.app__header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: max(14px, env(safe-area-inset-top)) 18px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app__headerTag {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
+
+.app__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.app__footer {
+  padding: 10px 18px max(12px, env(safe-area-inset-bottom));
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+/* ===== ワードマーク ===== */
+
+.logo {
+  font-family: var(--font-brand);
+  font-weight: 605;
+  font-variation-settings: "wght" 605;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--navy);
+}
+
+.logo--inverted {
+  color: var(--ink);
+}
+
+.logo__outline {
+  color: transparent;
+  -webkit-text-stroke: 1.3px currentColor;
+}
+
+.logo--inverted .logo__outline {
+  -webkit-text-stroke: 1.3px var(--ink);
+}
+
+/* ===== ステッパー ===== */
+
+.stepper {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 14px 18px 0;
+}
+
+.stepper__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  color: var(--ink-dim);
+}
+
+.stepper__dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--navy-3);
+}
+
+.stepper__item--now {
+  color: var(--ink);
+}
+
+.stepper__item--now .stepper__dot {
+  background: var(--aqua);
+  color: #04101f;
+}
+
+.stepper__item--done {
+  color: var(--ok);
+}
+
+.stepper__item--done .stepper__dot {
+  background: rgba(46, 204, 143, 0.18);
+  color: var(--ok);
+}
+
+.stepper__label {
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+/* ===== カード ===== */
+
+.card {
+  background: var(--navy-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card__title {
+  font-size: 16px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.card__desc {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink-dim);
+  margin: 0;
+}
+
+.card__desc strong {
+  color: var(--ink);
+}
+
+.card__note {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--ink-dim);
+  margin: 0;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  padding-top: 10px;
+}
+
+/* ===== フォーム ===== */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.field__input {
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  padding: 13px 14px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  background: #0a1c33;
+  color: var(--ink);
+  width: 100%;
+}
+
+.field__input:focus {
+  outline: none;
+  border-color: var(--aqua);
+}
+
+.field__check {
+  font-size: 12px;
+  color: var(--warn);
+  margin: 0;
+}
+
+.field__check--ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.field__notice {
+  font-size: 12px;
+  color: var(--aqua);
+  margin: 0;
+}
+
+.field__error {
+  font-size: 12px;
+  color: var(--ng);
+  margin: 0;
+}
+
+/* ===== ボタン ===== */
+
+.btn {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: var(--radius);
+  border: none;
+  padding: 12px 20px;
+  cursor: pointer;
+  transition: transform 0.08s, background 0.15s, opacity 0.15s;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--big {
+  padding: 16px 20px;
+  font-size: 16px;
+}
+
+.btn--primary {
+  background: var(--aqua);
+  color: #04101f;
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--ink-dim);
+}
+
+.btn--ghost:hover {
+  color: var(--ink);
+}
+
+.btn--danger-ghost {
+  background: transparent;
+  color: var(--ng);
+  opacity: 0.8;
+  font-size: 13px;
+}
+
+/* ===== 券面スキャナ ===== */
+
+.scan {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scan__box {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+  background: #04101f;
+}
+
+.scan__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scan__failed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+/* カードガイド枠(幅 90%・カード比率・中央) — IdiStep の切り出し計算と一致させること */
+.scan__guide {
+  position: absolute;
+  left: 5%;
+  width: 90%;
+  aspect-ratio: 85.6 / 54;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  box-shadow: 0 0 0 2000px rgba(4, 16, 31, 0.45);
+  pointer-events: none;
+}
+
+/* ID 行ハイライト(ガイド枠に対する ID_ROI と一致させること) */
+.scan__idbox {
+  position: absolute;
+  left: 42%;
+  right: 3%;
+  top: 69%;
+  height: 15%;
+  border: 2px solid var(--aqua);
+  border-radius: 6px;
+}
+
+.scan__caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.scan__caption strong {
+  color: var(--warn);
+}
+
+.scan__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ===== 顔登録(ダミー) ===== */
+
+.facePreview {
+  align-self: center;
+  width: 140px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.facePreview svg {
+  width: 100px;
+  height: 100px;
+}
+
+.facePreview__head {
+  fill: none;
+  stroke: var(--aqua);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
+.facePreview--active .facePreview__head {
+  filter: drop-shadow(0 0 12px rgba(77, 162, 255, 0.6));
+}
+
+.facePreview__bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+}
+
+.facePreview__fill {
+  height: 100%;
+  background: var(--aqua);
+  transition: width 0.1s linear;
+}
+
+/* ===== ダッシュボード ===== */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card--balance {
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.balance__label {
+  font-size: 11.5px;
+  color: var(--ink-dim);
+}
+
+.balance__value {
+  font-size: 40px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.balance__value small {
+  font-size: 16px;
+  color: var(--aqua);
+}
+
+.balance__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.balance__message {
+  font-size: 12px;
+  color: var(--ink-dim);
+  margin: 0;
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.info__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.info__row dt {
+  color: var(--ink-dim);
+  flex-shrink: 0;
+}
+
+.info__row dd {
+  margin: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.info__mono {
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 12px;
+}
+
+.info__ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.info__copy {
+  margin-left: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: none;
+  color: var(--ink-dim);
+  border-radius: 6px;
+  font-size: 10.5px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
