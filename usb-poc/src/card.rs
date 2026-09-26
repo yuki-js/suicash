@@ -28,7 +28,24 @@
 
 use anyhow::{bail, Context, Result};
 use felica::felica_standard::{FelicaDriver, FelicaStandard, ServiceCode};
-use felica::{open_reader, RemoteTarget, Reader, ReaderPreference};
+use felica::{init_port100, open_reader, Reader, ReaderPreference, RemoteTarget, UsbTransport};
+
+/// Sony vendor id, and the RC-S634/UA product id.
+///
+/// felica 1.0.3 の Port-100 ドライバは既定で RC-S380(06C1/06C3)しか見ないため、
+/// Hi-CARA 内蔵の RC-S634(06C2)は `open_reader` では開けない。RC-S634 も
+/// Port-100 系として話すので、UsbTransport で 06C2 を直接開いて Port-100
+/// ドライバを構築し、Reader ファサードに包む。
+const SONY_VENDOR_ID: u16 = 0x054C;
+const RCS634_PRODUCT_ID: u16 = 0x06C2;
+
+/// RC-S634(06C2)を直接開いて Reader を得る。
+fn open_rcs634() -> Result<Reader> {
+    let transport = UsbTransport::open(SONY_VENDOR_ID, RCS634_PRODUCT_ID)
+        .context("opening RC-S634 (054C:06C2) over USB")?;
+    let device = init_port100(transport).context("initialising the Port-100 chipset on RC-S634")?;
+    Ok(Reader::new(device))
+}
 
 /// Command codes, from `felica_standard::constants`. A response always uses
 /// `command + 1`.
@@ -87,8 +104,17 @@ impl Card {
         time_slots: u8,
         wait_secs: u64,
     ) -> Result<Self> {
-        let mut reader = open_reader(preference)
-            .context("opening the reader — check the USB cable and the udev rule")?;
+        // まず Hi-CARA 内蔵の RC-S634(06C2)を直接開く。無ければ通常の自動検出
+        // (RC-S380 等)にフォールバックする。
+        let mut reader = match open_rcs634() {
+            Ok(r) => r,
+            Err(rcs634_err) => open_reader(preference).with_context(|| {
+                format!(
+                    "opening the reader — check the USB cable and the udev rule \
+                     (RC-S634 direct open also failed: {rcs634_err:#})"
+                )
+            })?,
+        };
 
         println!("Reader: {}", describe(&reader));
         println!("Polling for a card (system code {system_code:04X}) for up to {wait_secs}s...");
