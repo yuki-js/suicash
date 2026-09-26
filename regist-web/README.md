@@ -15,11 +15,11 @@ npm run build    # 型チェック + 本番ビルド
 ### 本番: GitHub Pages(自動デプロイ)
 
 `face-regist` の `regist-web/**` に push すると、Actions
-(`.github/workflows/pages-regist-web.yml`)がビルドして GitHub Pages に公開する。
+(`.github/workflows/pages.yml`。`site/` の紹介ページと一緒に `/app/` として)がビルドして GitHub Pages に公開する。
 **HTTPS が自動で付く**ので、スマホの券面カメラ OCR(`getUserMedia` は
 secure context 必須)もそのまま動く。サーバー・Docker・SSH は不要。
 
-- 公開 URL: **https://yuki-js.github.io/suicash/**
+- 公開 URL: **https://yuki-js.github.io/suicash/app/**(ルートは `site/` の紹介ページ。旧 URL に `?treasury=` 等を付けたリンクは `/app/` へ転送される)
 - 初回のみ GitHub 側で有効化: Settings → Pages → Build and deployment →
   **Source: GitHub Actions**
 - `face-regist`(デフォルトブランチ以外)から公開するため、環境
