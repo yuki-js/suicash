@@ -67,7 +67,7 @@ export function ResultView({ mode, result, threshold, showUnlock, onRetry, onHom
 
       {ok && showUnlock ? (
         <div className="result__unlock">
-          <p>ZKP 証明を生成してウォレットをアンロックできます。</p>
+          <p>本人確認が端末内で完了しました。ウォレットをアンロックできます。</p>
           <button className="btn btn--accent" onClick={onUnlock}>
             ウォレットをアンロック
           </button>

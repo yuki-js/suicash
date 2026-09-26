@@ -214,8 +214,8 @@ export default function App() {
               </div>
               <h1>顔でウォレットを開く</h1>
               <p>
-                顔と IDi を紐づけて、ZKP 証明でウォレットをアンロックします。
-                顔画像そのものがブロックチェーンに載ることはありません。
+                顔認証はこの端末の中だけで行われます。
+                顔の画像やデータが端末の外へ保存・送信されることはありません。
               </p>
             </div>
 
@@ -250,8 +250,9 @@ export default function App() {
               </div>
               <h1>顔を登録する</h1>
               <p>
-                利用者の顔を撮影し、IDi と紐づけて登録します。
+                利用者の顔を撮影してこの端末に登録します。
                 登録データは端末メモリ内のみに保持され、アプリ終了で消えます。
+                端末の外へ送信されることはありません。
               </p>
             </div>
 
@@ -321,7 +322,7 @@ export default function App() {
             onRetry={() => startCamera(flow)}
             onHome={goHome}
             onUnlock={() => {
-              log("ZKP 証明を生成 → ウォレットをアンロック(モック)");
+              log("端末内で顔認証成立 → ウォレットをアンロック(モック)");
               setScreen("unlocked");
             }}
           />
@@ -337,7 +338,8 @@ export default function App() {
             </div>
             <h2>ウォレットをアンロックしました</h2>
             <p className="unlocked__sub">
-              IDi と顔の ZKP 証明が検証されました。残高照会・チャージ・送金が利用できます。
+              顔認証は端末内で完結し、顔データは外部へ送信されていません。
+              残高照会・チャージ・送金が利用できます。
             </p>
             <div className="unlocked__balance">
               <span className="unlocked__balanceLabel">残高(デモ)</span>
