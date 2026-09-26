@@ -36,7 +36,7 @@ use usb_poc::oracle::Oracle;
 const SYSTEM_CODE: u16 = 0x0003;
 const REQUEST_CODE: u8 = 0x00;
 const TIME_SLOTS: u8 = 0x00;
-const POLL_WAIT_SECS: u64 = 2; // 1 ポーリングの待ち(短くしてループを回す)
+const POLL_WAIT_SECS: u64 = 1;
 const AUTH1_TIMEOUT: u16 = 2000;
 const AUTH2_TIMEOUT: u16 = 1000;
 
@@ -55,6 +55,9 @@ struct Shared {
     current_idi: Option<String>,
     /// 端末への送信口(WS 接続中のみ Some)
     term_tx: Option<Sender<String>>,
+    /// 直近の card イベント JSON。WS 接続時に再送し、カードが載ったまま
+    /// 端末が起動/リロードしても反応するようにする。
+    last_card_json: Option<String>,
 }
 type State = Arc<Mutex<Shared>>;
 
@@ -141,8 +144,13 @@ fn ws_handle(
         let mut s = state.lock().unwrap();
         s.term_tx = Some(tx);
         let mode = mode_json(s.pay_mode);
+        let card = s.last_card_json.clone();
         drop(s);
         let _ = ws.send(tungstenite::Message::Text(mode));
+        // カードが既に載っているなら接続直後に再通知
+        if let Some(card) = card {
+            let _ = ws.send(tungstenite::Message::Text(card));
+        }
     }
 
     loop {
@@ -278,15 +286,18 @@ fn card_loop(state: State, cfg: Arc<Config>) {
 
     let mut last_idm = String::new();
     loop {
+        let t0 = std::time::Instant::now();
         match Card::poll(ReaderPreference::ForcePort100, SYSTEM_CODE, REQUEST_CODE, TIME_SLOTS, POLL_WAIT_SECS)
         {
             Ok(mut card) => {
                 let idm = hex::encode(card.idm);
                 if idm == last_idm {
-                    // 同じカードが載りっぱなし。離れるまで待つ
-                    thread::sleep(Duration::from_millis(500));
+                    // 同じカードが載りっぱなし。再オープン頻度を下げる
+                    thread::sleep(Duration::from_millis(800));
                     continue;
                 }
+                // タップを検出した瞬間に「認証中」を即通知(オラクル認証は数秒かかる)
+                send_terminal(&state, r#"{"type":"detecting"}"#.to_string());
                 match attest_with_card(&mut card, &oracle) {
                     Ok(idi) => {
                         last_idm = idm;
@@ -299,12 +310,22 @@ fn card_loop(state: State, cfg: Arc<Config>) {
                 }
             }
             Err(_) => {
-                // カードなし
-                if !last_idm.is_empty() {
+                // Err の種類を経過時間で区別する:
+                //  - 速い失敗(< 700ms): 再オープンの一過性失敗(チラつき)→ 離脱としない
+                //  - 遅い失敗(ポーリング満了): リーダーは開けたがカード無し → 離脱
+                // これで「載っていない=即離脱」「同じカードのリフト→再タッチ」を
+                // 速く確実に扱える(同じカードを連続で読める)。
+                let slow = t0.elapsed() >= Duration::from_millis(700);
+                if slow && !last_idm.is_empty() {
                     last_idm.clear();
-                    state.lock().unwrap().current_idi = None;
+                    {
+                        let mut s = state.lock().unwrap();
+                        s.current_idi = None;
+                        s.last_card_json = None;
+                    }
                     send_terminal(&state, r#"{"type":"cardRemoved"}"#.to_string());
                 }
+                thread::sleep(Duration::from_millis(200));
             }
         }
     }
@@ -340,9 +361,11 @@ fn on_card(state: &State, cfg: &Arc<Config>, idi: &str) {
     let balance = bal.get("balance").and_then(|x| x.as_str()).unwrap_or("0").to_string();
     // オンチェーン登録の判定は残高 > 0(regist-web でチャージ済み=登録済み)を代用
     let registered = balance.parse::<u128>().map(|n| n > 0).unwrap_or(false);
-    state.lock().unwrap().current_idi = Some(idi.to_string());
-    send_terminal(
-        state,
-        format!(r#"{{"type":"card","idi":"{idi}","registered":{registered},"balance":"{balance}"}}"#),
-    );
+    let json = format!(r#"{{"type":"card","idi":"{idi}","registered":{registered},"balance":"{balance}"}}"#);
+    {
+        let mut s = state.lock().unwrap();
+        s.current_idi = Some(idi.to_string());
+        s.last_card_json = Some(json.clone());
+    }
+    send_terminal(state, json);
 }
