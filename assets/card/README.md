@@ -8,3 +8,4 @@
 - ワードマークは [`../logo/suicash-logo.svg`](../logo/suicash-logo.svg) と同じ REM 605 の組み方。
   フォントは Google Fonts から `@import` で読み込む(オフラインでは sans-serif にフォールバック)。
 - マスコットは [`../mascot/suicash-mascot.svg`](../mascot/suicash-mascot.svg) を縮小配置。
+- `suicash-card-in.gif` — カードをリーダーへ挿入するループアニメーション(透過背景、465×487)。
