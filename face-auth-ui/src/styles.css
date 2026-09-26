@@ -1,0 +1,805 @@
+/* SuiCash 顔認証 UI — Hi-CARA 縦持ち端末を想定した携帯レイアウト
+ *
+ * 互換性の注意: 実機 (Android 10) の AOSP WebView は Chromium 74。
+ * そのため以下を使わない:
+ *   - flexbox の gap (84+) → 隣接セレクタの margin で代替
+ *   - aspect-ratio (88+)   → padding-bottom % で代替
+ *   - inset (87+)          → top/right/bottom/left を明示
+ *   - max() / dvh          → 静的フォールバックを先に書く
+ * grid の gap は Chromium 66+ なので使ってよい。
+ */
+
+:root {
+  --navy: #0a1a2f;
+  --navy-2: #12263f;
+  --navy-3: #1b3355;
+  --aqua: #4da2ff;
+  --aqua-dim: #2f6fb8;
+  --ok: #2ecc8f;
+  --ng: #ff5d6c;
+  --warn: #ffbf47;
+  --ink: #eaf2fb;
+  --ink-dim: #9db3cc;
+  --radius: 14px;
+  --font-ui: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+  --font-brand: "REM", var(--font-ui);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #060e1a;
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ===== 全体レイアウト ===== */
+
+.app {
+  max-width: 460px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--navy) 0%, #0c1f38 60%, var(--navy) 100%);
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.6);
+}
+
+.app__header {
+  display: flex;
+  align-items: baseline;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.app__header > * + * {
+  margin-left: 10px;
+}
+
+.app__headerTag {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
+
+.app__badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ok);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 2px 10px;
+  align-self: center;
+}
+
+.app__badge--enroll {
+  color: var(--warn);
+}
+
+/* 登録モード中であることを常時示すバナー(切替は母艦 CLI のみ) */
+
+.modeBanner {
+  background: rgba(255, 191, 71, 0.12);
+  border-bottom: 1px solid rgba(255, 191, 71, 0.4);
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  padding: 8px 16px;
+}
+
+.app__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 18px;
+}
+
+.app__footer {
+  padding: 8px 18px 10px;
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+/* ===== ワードマーク ===== */
+
+.logo {
+  font-family: var(--font-brand);
+  font-weight: 605;
+  font-variation-settings: "wght" 605;
+  font-kerning: none;
+  font-variant-ligatures: none;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--navy);
+}
+
+.logo--inverted {
+  color: var(--ink);
+}
+
+.logo__outline {
+  color: transparent;
+  -webkit-text-stroke: 1.4px currentColor;
+}
+
+.logo--inverted .logo__outline {
+  -webkit-text-stroke: 1.4px var(--ink);
+}
+
+/* ===== ホーム ===== */
+
+.home {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.home > * + * {
+  margin-top: 22px;
+}
+
+.home__hero {
+  text-align: center;
+  padding: 26px 8px 4px;
+}
+
+.home__hero h1 {
+  font-size: 22px;
+  font-weight: 900;
+  margin: 18px 0 8px;
+  letter-spacing: 0.02em;
+}
+
+.home__hero p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--ink-dim);
+  margin: 0;
+}
+
+.home__faceMark svg {
+  width: 108px;
+  height: 108px;
+  fill: var(--aqua);
+  filter: drop-shadow(0 0 18px rgba(77, 162, 255, 0.35));
+}
+
+.home__faceHead {
+  fill: none;
+  stroke: var(--aqua);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.home__actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.home__actions > * + * {
+  margin-top: 12px;
+}
+
+.home__note {
+  font-size: 11.5px;
+  color: var(--ink-dim);
+  text-align: center;
+  margin: auto 0 0;
+  padding-top: 14px;
+}
+
+/* 登録モードのステータス行(表示のみ。操作は母艦 CLI から) */
+
+.enrollStatus {
+  display: flex;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--ink-dim);
+  background: var(--navy-2);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+.enrollStatus > * + * {
+  margin-left: 18px;
+}
+
+.enrollStatus--ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.home__faceMark--enroll .home__plus rect {
+  fill: var(--warn);
+}
+
+/* ===== ボタン ===== */
+
+.btn {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  border-radius: var(--radius);
+  border: none;
+  padding: 13px 22px;
+  cursor: pointer;
+  transition: transform 0.08s, background 0.15s, opacity 0.15s;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn--big {
+  padding: 17px 22px;
+  font-size: 17px;
+}
+
+.btn--small {
+  padding: 9px 16px;
+  font-size: 13px;
+}
+
+.btn--primary {
+  background: var(--aqua);
+  color: #04101f;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: #6cb4ff;
+}
+
+.btn--outline {
+  background: transparent;
+  color: var(--aqua);
+  border: 2px solid var(--aqua);
+}
+
+.btn--outline:hover {
+  background: rgba(77, 162, 255, 0.12);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--ink-dim);
+}
+
+.btn--ghost:hover {
+  color: var(--ink);
+}
+
+.btn--accent {
+  background: var(--ok);
+  color: #04180f;
+}
+
+.btn--accent:hover {
+  background: #4ddba4;
+}
+
+/* ===== カメラ画面 ===== */
+
+.capture {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.capture > * + * {
+  margin-top: 14px;
+}
+
+/* aspect-ratio の代わりに padding-bottom で 3:4 を確保(子は絶対配置) */
+.camera {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  width: 100%;
+  height: 0;
+  padding-bottom: 133.33%;
+  background: #04101f;
+}
+
+.camera__video {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* getUserMedia の生映像は非鏡像なので CSS で鏡像化する(ブラウザ開発時のみ) */
+.camera__video--mirror {
+  transform: scaleX(-1);
+}
+
+.camera__placeholder {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+.camera__placeholder > * + * {
+  margin-top: 12px;
+}
+
+.camera__silhouette {
+  width: 40%;
+  fill: var(--navy-3);
+}
+
+.camera__guide {
+  position: absolute;
+  left: 50%;
+  top: 44%;
+  width: 62%;
+  height: 58%;
+  transform: translate(-50%, -50%);
+  border: 3px dashed rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  transition: border-color 0.2s;
+  pointer-events: none;
+}
+
+.camera__guide--ok {
+  border-color: var(--ok);
+  border-style: solid;
+  box-shadow: 0 0 24px rgba(46, 204, 143, 0.35);
+}
+
+.camera__box {
+  position: absolute;
+  border: 2px solid var(--warn);
+  border-radius: 8px;
+  transition: all 0.18s linear;
+  pointer-events: none;
+}
+
+.camera__box--ok {
+  border-color: var(--ok);
+}
+
+.camera__rotBadge {
+  position: absolute;
+  top: -22px;
+  right: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--warn);
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+.camera__hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 22px 16px 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  background: linear-gradient(0deg, rgba(4, 16, 31, 0.85), transparent);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* 品質メーター(grid の gap は Chromium 66+ なので使える) */
+
+.capture__meters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  background: var(--navy-2);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+
+.meter__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  margin-bottom: 4px;
+}
+
+.meter__label {
+  color: var(--ink-dim);
+}
+
+.meter__value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.meter--pass .meter__value {
+  color: var(--ok);
+}
+
+.meter--fail .meter__value {
+  color: var(--warn);
+}
+
+.meter__track {
+  position: relative;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: visible;
+}
+
+.meter__fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--warn);
+  transition: width 0.18s linear;
+}
+
+.meter--pass .meter__fill {
+  background: var(--ok);
+}
+
+.meter__gate {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 12px;
+  background: var(--ink);
+  opacity: 0.7;
+}
+
+.capture__actions {
+  display: flex;
+}
+
+.capture__actions > * + * {
+  margin-left: 10px;
+}
+
+.capture__actions .btn--primary {
+  flex: 1;
+}
+
+/* ===== 処理中 ===== */
+
+.processing {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.processing > * + * {
+  margin-top: 18px;
+}
+
+.processing__spinner {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 5px solid rgba(77, 162, 255, 0.25);
+  border-top-color: var(--aqua);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== 結果 ===== */
+
+.result {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 10px 6px;
+}
+
+.result > * + * {
+  margin-top: 14px;
+}
+
+.result__icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 900;
+  animation: pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+}
+
+.result--ok .result__icon {
+  background: rgba(46, 204, 143, 0.15);
+  color: var(--ok);
+  box-shadow: 0 0 32px rgba(46, 204, 143, 0.3);
+}
+
+.result--ng .result__icon {
+  background: rgba(255, 93, 108, 0.15);
+  color: var(--ng);
+}
+
+.result__title {
+  font-size: 21px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.result__score {
+  margin: 4px 0;
+}
+
+.result__confidence {
+  font-size: 58px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.result--ok .result__confidence {
+  color: var(--ok);
+}
+
+.result--ng .result__confidence {
+  color: var(--ng);
+}
+
+.result__thresholdRow {
+  display: flex;
+  justify-content: center;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+  margin-top: 4px;
+}
+
+.result__thresholdRow > * + * {
+  margin-left: 8px;
+}
+
+.result__vs {
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.result__note {
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--ink-dim);
+  max-width: 320px;
+  margin: 0;
+}
+
+.result__unlock {
+  background: var(--navy-2);
+  border: 1px solid rgba(46, 204, 143, 0.35);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 340px;
+}
+
+.result__unlock > * + * {
+  margin-top: 12px;
+}
+
+.result__unlock p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-dim);
+}
+
+.result__actions {
+  display: flex;
+  margin-top: 8px;
+}
+
+.result__actions > * + * {
+  margin-left: 10px;
+}
+
+/* ===== アンロック完了 ===== */
+
+.unlocked {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.unlocked > * + * {
+  margin-top: 14px;
+}
+
+.unlocked h2 {
+  font-size: 21px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.unlocked__sub {
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--ink-dim);
+  max-width: 320px;
+  margin: 0;
+}
+
+.unlocked__ring {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(46, 204, 143, 0.12);
+  box-shadow: 0 0 40px rgba(46, 204, 143, 0.35);
+  animation: pop 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+.unlocked__ring svg {
+  width: 52px;
+  height: 52px;
+}
+
+.unlocked__shackle {
+  stroke: var(--ok);
+  transform-origin: 14px 22px;
+  animation: openShackle 0.6s 0.25s ease-out forwards;
+}
+
+@keyframes openShackle {
+  to {
+    transform: rotate(-28deg);
+  }
+}
+
+.unlocked__body {
+  fill: var(--ok);
+}
+
+.unlocked__balance {
+  background: var(--navy-2);
+  border-radius: var(--radius);
+  padding: 14px 26px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+}
+
+.unlocked__balance > * + * {
+  margin-top: 4px;
+}
+
+.unlocked__balanceLabel {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.unlocked__balanceValue {
+  font-size: 30px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.unlocked__balanceValue small {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--aqua);
+}
+
+/* ===== デバッグログ ===== */
+
+.log {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.log__toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--ink-dim);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 18px;
+  cursor: pointer;
+}
+
+.log__toggle:hover {
+  color: var(--ink);
+}
+
+.log__body {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 0 18px 12px;
+  font-family: "SF Mono", "Consolas", monospace;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.log__line {
+  margin: 0;
+  color: var(--ink-dim);
+  word-break: break-all;
+}
+
+.log__time {
+  color: var(--aqua-dim);
+}
+
+.log__empty {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+/* 幅の広い画面では端末風に浮かせる */
+
+@media (min-width: 520px) {
+  body {
+    padding: 24px 0;
+  }
+
+  .app {
+    min-height: calc(100vh - 48px);
+    min-height: calc(100dvh - 48px);
+    border-radius: 28px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}

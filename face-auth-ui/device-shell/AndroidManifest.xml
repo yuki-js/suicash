@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SuiCash UI Shell — Hi-CARA 実機に face-auth-ui (React) を表示するための最小 WebView シェル。
+
+  端末にはブラウザが無いため、adb reverse で PC の dev サーバ (localhost:5173) を
+  端末側 localhost に見せ、それを WebView で全画面表示する。
+
+  URL は intent の data で差し替えられる:
+    adb shell am start -n jp.serkenn.hicara.suicashui/.MainActivity \
+      -d "http://localhost:5173/?mode=enroll"
+  singleTask + onNewIntent なので、起動中でも同コマンドで画面を切り替えられる
+  (母艦 CLI からのモード切替の第一実装)。
+
+  http (cleartext) は localhost 相手なので usesCleartextTraffic=true で許可。
+  getUserMedia は http://localhost が secure context 扱いのため動く。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="jp.serkenn.hicara.suicashui"
+    android:versionCode="1"
+    android:versionName="0.1">
+
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="29" />
+
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+
+    <application
+        android:label="SuiCash UI"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true"
+        android:extractNativeLibs="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
