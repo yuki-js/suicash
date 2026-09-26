@@ -222,15 +222,39 @@ pub fn verify_attestation_detailed(
     vk: &FelicaVerifyingKey,
     att: &Attestation,
 ) -> Result<(), VerifyError> {
-    if att.proof.alg != SUPPORTED_ALG {
+    let proof = parse_proof_points(&att.proof)?;
+    let pis = parse_public_inputs(&att.proof)?;
+
+    if !verify_proof(vk, &pis, &proof) {
+        return Err(VerifyError::ProofInvalid);
+    }
+
+    // The proof is valid. Now the envelope must agree with what it commits to.
+    let decoded =
+        PublicInputs::from_fr(&pis).map_err(|_| VerifyError::Malformed("non-canonical inputs"))?;
+    if decoded.idi != att.idi {
+        return Err(VerifyError::EnvelopeInconsistent);
+    }
+    if decoded.attested_at != att.attested_at {
+        return Err(VerifyError::EnvelopeInconsistent);
+    }
+    Ok(())
+}
+
+/// Decode the hex-coordinate wire proof back into an Arkworks proof object.
+///
+/// Rejects an unsupported `alg`, undecodable hex, and points off the curve or
+/// outside the prime-order subgroup — the same checks
+/// [`verify_attestation_detailed`] has always run; they now live here so every
+/// consumer of the wire form (local verification, Sui serialization) applies
+/// them identically.
+pub fn parse_proof_points(proof: &Groth16Proof) -> Result<ark_groth16::Proof<Bn254>, VerifyError> {
+    if proof.alg != SUPPORTED_ALG {
         return Err(VerifyError::Malformed("unsupported alg label"));
     }
-    if att.proof.public_inputs.len() != PUBLIC_INPUT_COUNT {
-        return Err(VerifyError::Malformed("wrong public-input count"));
-    }
-    let (ax, ay) = (&att.proof.a.0, &att.proof.a.1);
-    let (cx, cy) = (&att.proof.c.0, &att.proof.c.1);
-    let ((bx0, bx1), (by0, by1)) = (&att.proof.b.0, &att.proof.b.1);
+    let (ax, ay) = (&proof.a.0, &proof.a.1);
+    let (cx, cy) = (&proof.c.0, &proof.c.1);
+    let ((bx0, bx1), (by0, by1)) = (&proof.b.0, &proof.b.1);
     let (ax, ay, cx, cy) = match (parse_fq(ax), parse_fq(ay), parse_fq(cx), parse_fq(cy)) {
         (Some(a), Some(b), Some(c), Some(d)) => (a, b, c, d),
         _ => return Err(VerifyError::Malformed("undecodable G1 coordinate")),
@@ -253,30 +277,54 @@ pub fn verify_attestation_detailed(
     if !b.is_on_curve() || !b.is_in_correct_subgroup_assuming_on_curve() {
         return Err(VerifyError::Malformed("G2 point off curve or subgroup"));
     }
-    let proof = ark_groth16::Proof { a, b, c };
+    Ok(ark_groth16::Proof { a, b, c })
+}
 
+/// Decode the wire public inputs into field elements, count-checked.
+pub fn parse_public_inputs(proof: &Groth16Proof) -> Result<Vec<Fr>, VerifyError> {
+    if proof.public_inputs.len() != PUBLIC_INPUT_COUNT {
+        return Err(VerifyError::Malformed("wrong public-input count"));
+    }
     let mut pis = Vec::with_capacity(PUBLIC_INPUT_COUNT);
-    for s in &att.proof.public_inputs {
+    for s in &proof.public_inputs {
         match parse_fr(s) {
             Some(f) => pis.push(f),
             None => return Err(VerifyError::Malformed("undecodable public input")),
         }
     }
+    Ok(pis)
+}
 
-    if !verify_proof(vk, &pis, &proof) {
-        return Err(VerifyError::ProofInvalid);
-    }
+/// The Arkworks canonical *compressed* serialization of a wire proof — the
+/// single blob `sui::groth16::proof_points_from_bytes` consumes.
+///
+/// This is a re-serialization of the same proof object the JSON coordinates
+/// describe, not a second proof: [`prove_compressed`] emits the identical
+/// bytes at proving time, and this function recovers them from the RPC form
+/// for callers that only ever saw the JSON.
+pub fn proof_compressed_bytes(proof: &Groth16Proof) -> Result<Vec<u8>, VerifyError> {
+    let parsed = parse_proof_points(proof)?;
+    let mut out = Vec::new();
+    parsed
+        .serialize_compressed(&mut out)
+        .map_err(|_| VerifyError::Malformed("proof does not serialize"))?;
+    Ok(out)
+}
 
-    // The proof is valid. Now the envelope must agree with what it commits to.
-    let decoded =
-        PublicInputs::from_fr(&pis).map_err(|_| VerifyError::Malformed("non-canonical inputs"))?;
-    if decoded.idi != att.idi {
-        return Err(VerifyError::EnvelopeInconsistent);
+/// The packed 96-byte public-input blob (`3 × 32B` little-endian scalars) the
+/// Move verifier's `felica_auth::new` expects, recovered from the wire form.
+///
+/// Round-trips through `Fr` rather than concatenating the hex directly, so a
+/// non-canonical wire encoding is rejected here exactly as the verifier would
+/// reject it on chain.
+pub fn public_inputs_bytes(proof: &Groth16Proof) -> Result<Vec<u8>, VerifyError> {
+    let pis = parse_public_inputs(proof)?;
+    let mut out = Vec::with_capacity(PUBLIC_INPUT_COUNT * 32);
+    for f in &pis {
+        f.serialize_compressed(&mut out)
+            .map_err(|_| VerifyError::Malformed("public input does not serialize"))?;
     }
-    if decoded.attested_at != att.attested_at {
-        return Err(VerifyError::EnvelopeInconsistent);
-    }
-    Ok(())
+    Ok(out)
 }
 
 /// Boolean form of [`verify_attestation_detailed`].

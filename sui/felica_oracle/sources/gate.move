@@ -110,6 +110,16 @@ public fun verify_and_claim<Key: drop>(
     verified_idi
 }
 
+/// Share a gate, making it the deployment's public verification point.
+///
+/// Lives here and not in a caller because `Gate` has `key` without `store`,
+/// so `transfer::share_object` is only callable from this module. Sharing is
+/// the intended topology: every payer must be able to burn `r1` values in
+/// the *same* dedup store, or replay protection fragments per owner.
+public fun share<Key: drop>(gate: Gate<Key>) {
+    transfer::share_object(gate)
+}
+
 /// Add an IDi to the allowlist, and narrow the gate to exactly the list.
 ///
 /// Clearing `allow_any` here is the point: once a deployment has expressed a
