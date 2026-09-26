@@ -63,6 +63,24 @@ flowchart TD
     A --> B --> C --> D
 ```
 
+## Sui エンドポイント(429 レート制限対策)
+
+チャージや残高取得に使う公開 testnet エンドポイント(fullnode RPC / faucet)は
+共有 IP からのアクセスが集中すると **429(レート制限)** を返す。デモで安定させたい
+場合は、自前 or 別の RPC / faucet に差し替えられる(優先順:URL クエリ >
+localStorage > ビルド時 env > 既定):
+
+| 対象 | URL クエリ | localStorage | ビルド時 env |
+| --- | --- | --- | --- |
+| fullnode RPC | `?rpc=<url>` | `suicash.rpc` | `VITE_SUI_RPC` |
+| faucet | `?faucet=<url>` | `suicash.faucet` | `VITE_SUI_FAUCET` |
+
+例: `https://<host>/?rpc=https://your-node/....&faucet=https://your-faucet/...`
+(一度クエリで渡すと localStorage に保存され、次回以降は付けなくてよい)
+
+429 が出たときは UI 側でクールダウン(再試行まで N 秒)を表示する。faucet は
+同一アドレス・同一 IP への連続要求を制限するので、少し間隔をあけて試すこと。
+
 ## プライバシー設計
 
 - **IDi(カード番号)は外部へ送らない**。外部(チェーン・IDi 検証サーバー)に

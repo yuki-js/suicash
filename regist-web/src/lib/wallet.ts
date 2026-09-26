@@ -15,6 +15,10 @@ import { getFaucetHost, requestSuiFromFaucetV2 } from "@mysten/sui/faucet";
  * ここで作るのは、その口座アドレスを決めるための決定的ウォレット。
  *
  * ネットワークは Sui testnet。チャージは testnet faucet を使う。
+ *
+ * エンドポイントは差し替え可能(公開エンドポイントは 429 レート制限が出やすい):
+ *   - fullnode RPC : ?rpc=<url> / localStorage suicash.rpc / VITE_SUI_RPC
+ *   - faucet       : ?faucet=<url> / localStorage suicash.faucet / VITE_SUI_FAUCET
  */
 
 const NETWORK = "testnet" as const;
@@ -22,7 +26,27 @@ const NETWORK = "testnet" as const;
 /** ドメイン分離タグ(用途違いで同じ IDi から別鍵が出ないように) */
 const SEED_DOMAIN = "suicash-aa-wallet:v1:";
 
-export const client = new SuiClient({ url: getFullnodeUrl(NETWORK) });
+/** 設定値を URL クエリ → localStorage → ビルド時 env → 既定 の順で解決 */
+function setting(key: string, envKey: string, fallback: string): string {
+  try {
+    const q = new URLSearchParams(window.location.search).get(key);
+    if (q) {
+      localStorage.setItem(`suicash.${key}`, q);
+      return q;
+    }
+    const stored = localStorage.getItem(`suicash.${key}`);
+    if (stored) return stored;
+  } catch {
+    // localStorage 不可でも続行
+  }
+  const env = (import.meta.env as Record<string, string | undefined>)[envKey];
+  return env || fallback;
+}
+
+const RPC_URL = setting("rpc", "VITE_SUI_RPC", getFullnodeUrl(NETWORK));
+const FAUCET_URL = setting("faucet", "VITE_SUI_FAUCET", getFaucetHost(NETWORK));
+
+export const client = new SuiClient({ url: RPC_URL });
 
 /** IDi(16 hex 文字)→ 32 バイトのシード(SHA-256(domain || idiBytes)) */
 async function seedFromIdi(idiHex: string): Promise<Uint8Array> {
@@ -72,15 +96,45 @@ export async function fetchBalance(address: string): Promise<string | null> {
   }
 }
 
-/** testnet faucet からチャージ。成功で true */
-export async function requestCharge(address: string): Promise<boolean> {
+export interface ChargeResult {
+  ok: boolean;
+  /** ユーザー向けメッセージ */
+  message: string;
+  /** 429 等でのクールダウン秒数(分かれば) */
+  retryAfterSec?: number;
+}
+
+/**
+ * testnet faucet からチャージ。
+ * 公開 faucet はレート制限(429)が出やすいので、理由とクールダウンを返す。
+ */
+export async function requestCharge(address: string): Promise<ChargeResult> {
   try {
-    await requestSuiFromFaucetV2({
-      host: getFaucetHost(NETWORK),
-      recipient: address,
-    });
-    return true;
-  } catch {
-    return false;
+    await requestSuiFromFaucetV2({ host: FAUCET_URL, recipient: address });
+    return { ok: true, message: "チャージしました(testnet faucet)" };
+  } catch (e) {
+    const status = extractStatus(e);
+    if (status === 429) {
+      return {
+        ok: false,
+        message:
+          "faucet が混雑しています(レート制限)。時間をおくか、同じアドレスは一定時間あけて再度お試しください。",
+        retryAfterSec: 60,
+      };
+    }
+    const detail = e instanceof Error ? e.message : String(e);
+    return { ok: false, message: `チャージに失敗しました: ${detail}` };
   }
+}
+
+/** 例外オブジェクトから HTTP ステータスらしき数値を拾う */
+function extractStatus(e: unknown): number | undefined {
+  if (typeof e === "object" && e !== null) {
+    const anyE = e as Record<string, unknown>;
+    if (typeof anyE.status === "number") return anyE.status;
+    const msg = e instanceof Error ? e.message : "";
+    const m = msg.match(/\b(429|4\d\d|5\d\d)\b/);
+    if (m) return Number(m[1]);
+  }
+  return undefined;
 }

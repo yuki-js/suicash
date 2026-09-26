@@ -14,6 +14,7 @@ export function Dashboard({ reg, address, onReset }: Props) {
   const [balance, setBalance] = useState<string | null>(null);
   const [charging, setCharging] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
   const [copied, setCopied] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -24,16 +25,23 @@ export function Dashboard({ reg, address, onReset }: Props) {
     refresh();
   }, [refresh]);
 
+  // クールダウンのカウントダウン
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = window.setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [cooldown]);
+
   const charge = async () => {
     setCharging(true);
     setMessage(null);
-    const ok = await requestCharge(address);
-    if (ok) {
-      setMessage("チャージしました(testnet faucet)");
+    const res = await requestCharge(address);
+    setMessage(res.message);
+    if (res.ok) {
       // faucet の反映には少し時間がかかる
       window.setTimeout(refresh, 3000);
-    } else {
-      setMessage("チャージに失敗しました(faucet が混雑中の可能性)。時間をおいてお試しください。");
+    } else if (res.retryAfterSec) {
+      setCooldown(res.retryAfterSec);
     }
     setCharging(false);
   };
@@ -56,8 +64,12 @@ export function Dashboard({ reg, address, onReset }: Props) {
           {balance === null ? "--" : balance} <small>SUI</small>
         </div>
         <div className="balance__actions">
-          <button className="btn btn--primary" disabled={charging} onClick={charge}>
-            {charging ? "チャージ中…" : "チャージする"}
+          <button
+            className="btn btn--primary"
+            disabled={charging || cooldown > 0}
+            onClick={charge}
+          >
+            {charging ? "チャージ中…" : cooldown > 0 ? `再試行まで ${cooldown}s` : "チャージする"}
           </button>
           <button className="btn btn--ghost" onClick={refresh}>
             残高を更新
