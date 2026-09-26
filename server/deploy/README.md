@@ -1,14 +1,14 @@
-# オラクルを Debian で動かす + cloudflared で公開
+# Running the oracle on Debian + exposing it with cloudflared
 
-FeliCa オラクル(`server/` クレート)を Debian サーバで常駐させ、
-Cloudflare Tunnel(cloudflared)で HTTPS 公開する手順。オラクルは
-127.0.0.1 のみで待受し、ポートは直接開けず cloudflared だけを出口にする。
+Steps to run the FeliCa oracle (`server/` crate) as a service on a Debian server and
+expose it over HTTPS via Cloudflare Tunnel (cloudflared). The oracle listens on
+127.0.0.1 only; no ports are opened directly and cloudflared is the only way out.
 
 ```
-[Suica] ⇄ 母艦(usb-poc/facepay-host) ──HTTPS──> Cloudflare ──tunnel──> cloudflared ──> 127.0.0.1:3000 (oracle)
+[Suica] ⇄ host PC (usb-poc/facepay-host) ──HTTPS──> Cloudflare ──tunnel──> cloudflared ──> 127.0.0.1:3000 (oracle)
 ```
 
-## 0. clone(usb-poc ブランチ)
+## 0. Clone (usb-poc branch)
 
 ```sh
 sudo mkdir -p /opt/suicash && sudo chown "$USER" /opt/suicash
@@ -16,10 +16,10 @@ git clone -b usb-poc --single-branch https://github.com/yuki-js/suicash.git /opt
 cd /opt/suicash
 ```
 
-`prover/assets/proving_key.bin`(31MB)と `usb-poc/vendor/felica` も含まれる
-(git-lfs 不要)。プライベートなら `gh auth login` か token 付き URL を使う。
+`prover/assets/proving_key.bin` (31MB) and `usb-poc/vendor/felica` are included
+(no git-lfs needed). If the repo is private, use `gh auth login` or a URL with a token.
 
-## 1. ビルド(Rust)
+## 1. Build (Rust)
 
 ```sh
 sudo apt update && sudo apt install -y build-essential pkg-config curl git
@@ -29,91 +29,92 @@ cargo build --release --manifest-path server/Cargo.toml --bin oracle
 # → server/target/release/oracle
 ```
 
-## 2. 鍵(FELICA_KEYS_JSON)を配置
+## 2. Install the keys (FELICA_KEYS_JSON)
 
-**これがカードごとの秘密**。実カード用は今のオラクルと同じ gsk/usk/ノードパス
-が必要(担当者から値を取得、または `keys.jsonl` から
-`cargo run -p felica-prover --bin felica-keys` で再生成)。リポジトリには入れない。
+**These are the per-card secrets.** Real cards need the same gsk/usk/node paths as the
+current oracle (get the values from the maintainer, or regenerate them from `keys.jsonl`
+with `cargo run -p felica-prover --bin felica-keys`). Never commit them to the repository.
 
 ```sh
 sudo mkdir -p /etc/felica-oracle
 sudo tee /etc/felica-oracle/keys.json >/dev/null <<'JSON'
 {"gsk":"<16hex>","usk":"<16hex>","system_code":3,"areas":[0,64,2048,4032,4096],"services":[74]}
 JSON
-# サービス実行ユーザー(felica)が読めるよう所有者を合わせる。
-# root 所有 + mode 600 のままだと "Permission denied (os error 13)" で起動失敗する。
+# Make the file owned by the service user (felica) so it can read it.
+# Left as root-owned + mode 600, startup fails with "Permission denied (os error 13)".
 sudo chown felica:felica /etc/felica-oracle/keys.json
 sudo chmod 600 /etc/felica-oracle/keys.json
 ```
 
-> /opt/suicash を root で clone した場合、felica ユーザーが proving key や
-> バイナリを読めず同じ 13 が出ることがある。その時は:
-> `sudo chmod -R a+rX /opt/suicash` (少なくとも prover/assets と server/target/release)。
+> If /opt/suicash was cloned as root, the felica user may be unable to read the proving key
+> or binary and hit the same error 13. In that case:
+> `sudo chmod -R a+rX /opt/suicash` (at least prover/assets and server/target/release).
 
-動作確認だけなら fixture 鍵(`server/src/oracle/fixture.rs`。`rpc_attest` 例が
-正確な JSON を出力)を使う。
+For a quick smoke test, use the fixture keys (`server/src/oracle/fixture.rs`; the
+`rpc_attest` example prints the exact JSON).
 
-## 3. オラクルを常駐(systemd)
+## 3. Run the oracle as a service (systemd)
 
 ```sh
 sudo useradd -r -s /usr/sbin/nologin felica 2>/dev/null || true
 sudo cp server/deploy/felica-oracle.service /etc/systemd/system/
-# ユニット内の User / パスを環境に合わせて調整
+# Adjust User / paths in the unit to your environment
 sudo systemctl daemon-reload
 sudo systemctl enable --now felica-oracle
-# 確認
+# Check
 curl -s -X POST http://127.0.0.1:3000 -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}'   # → "pong"
 sudo journalctl -u felica-oracle -f
 ```
 
-> ⚠ 証明生成(attest)は 1 回 ~500MB。メモリ不足だと attest でプロセスが落ち、
-> ping ごと無応答(502/524)になる。ユニットの `MemoryMax` と実メモリを確認。
+> ⚠ Proof generation (attest) takes ~500MB per run. Without enough memory the process dies
+> during attest and even ping stops responding (502/524). Check the unit's `MemoryMax` and
+> actual memory.
 
-## 4. cloudflared で公開
+## 4. Expose with cloudflared
 
 ```sh
-# インストール(Debian amd64)
+# Install (Debian amd64)
 curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o /tmp/cloudflared.deb
 sudo dpkg -i /tmp/cloudflared.deb
 
-cloudflared tunnel login                      # ブラウザで Cloudflare アカウント認可
-cloudflared tunnel create felica-oracle       # → <TUNNEL_ID> と /root/.cloudflared/<ID>.json
+cloudflared tunnel login                      # authorize your Cloudflare account in a browser
+cloudflared tunnel create felica-oracle       # → <TUNNEL_ID> and /root/.cloudflared/<ID>.json
 
-# 設定を配置(example を編集: TUNNEL_ID / hostname / credentials-file)
+# Install the config (edit the example: TUNNEL_ID / hostname / credentials-file)
 sudo mkdir -p /etc/cloudflared
 sudo cp server/deploy/cloudflared-config.example.yml /etc/cloudflared/config.yml
 sudo cp ~/.cloudflared/<TUNNEL_ID>.json /etc/cloudflared/
-sudo $EDITOR /etc/cloudflared/config.yml       # <TUNNEL_ID> と hostname を実値に
+sudo $EDITOR /etc/cloudflared/config.yml       # set <TUNNEL_ID> and hostname to real values
 
-# DNS ルート(サブドメインをトンネルへ)
+# DNS route (point the subdomain at the tunnel)
 cloudflared tunnel route dns felica-oracle felica-oracle.example.com
 
-# 常駐サービス化(config.yml を使う)
+# Install as a service (uses config.yml)
 sudo cloudflared service install
 sudo systemctl enable --now cloudflared
 ```
 
-公開 URL は `https://felica-oracle.example.com`。動作確認:
+The public URL is `https://felica-oracle.example.com`. To check:
 
 ```sh
 curl -s -X POST https://felica-oracle.example.com -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}'   # → "pong"
 ```
 
-## 5. クライアントを新オラクルへ向ける
+## 5. Point clients at the new oracle
 
 ```sh
 # usb-poc
 ./usb-poc/target/release/usb-poc --oracle https://felica-oracle.example.com
-# facepay-host(決済端末デーモン)
+# facepay-host (payment terminal daemon)
 FACEPAY_ORACLE=https://felica-oracle.example.com/ cargo run --release ...
 ```
 
-## トラブルシュート
+## Troubleshooting
 
-- `ping` は 200 だが `attest` で 502/524 → 証明生成でプロセスが落ちている。
-  メモリ増設 / `MemoryMax` 緩和 / `journalctl -u felica-oracle` で OOM・panic 確認。
-- cloudflared 側 524(タイムアウト)→ Cloudflare エッジは最大 100 秒。
-  証明は数秒なので、524 が出るならバックエンドが無応答(上と同じ)。
-- `challenge` は通るが `settle` が失敗 → 鍵(gsk/usk)がカードと不一致。
+- `ping` returns 200 but `attest` gives 502/524 → the process is dying during proof generation.
+  Add memory / relax `MemoryMax` / check `journalctl -u felica-oracle` for OOM or panic.
+- 524 (timeout) from cloudflared → the Cloudflare edge allows at most 100 seconds.
+  Proofs take a few seconds, so a 524 means the backend is unresponsive (same as above).
+- `challenge` succeeds but `settle` fails → the keys (gsk/usk) don't match the card.

@@ -176,7 +176,7 @@ impl ServiceCode {
     /// Whether accessing this service requires prior mutual authentication.
     ///
     /// The authentication requirement is the low bit of the service attribute:
-    /// table 3-2 pairs every "認証必要" value with the "認証不要" value one
+    /// table 3-2 pairs every "authentication required" value with the "authentication not required" value one
     /// greater, so an even attribute requires a key.
     pub fn requires_key(&self) -> bool {
         self.0 & 0x0001 == 0
@@ -238,14 +238,14 @@ impl StatusFlag1 {
         }
     }
 
-    /// Reads the error byte under §4.5.1's "エラー箇所を順番で示す" encoding, where
+    /// Reads the error byte under §4.5.1's "error location given as an index" encoding, where
     /// the byte *is* the 1-based position in the list — an error on the 10th
     /// block list entry is reported as `0Ah`.
     pub fn ordinal_position(&self) -> Option<u8> {
         self.error_byte()
     }
 
-    /// Reads the error byte under §4.5.1's "エラー箇所をビットデータで示す" encoding,
+    /// Reads the error byte under §4.5.1's "error location given as bit data" encoding,
     /// returning every 1-based list position a set bit can denote.
     ///
     /// In that encoding bit *n* (for `n` in 0..=6) means the *(n+1)*-th **or**

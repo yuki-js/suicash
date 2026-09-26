@@ -497,7 +497,7 @@ impl EmulatedSystem {
     /// pair the card would return.
     ///
     /// `require_auth_free` distinguishes Read/Write Without Encryption, which may
-    /// only reach services whose attribute is "認証不要", from the encrypted
+    /// only reach services whose attribute is "authentication not required", from the encrypted
     /// Read/Write, which §4.2 allows on both kinds of service.
     fn validate_block_element(
         &self,
@@ -509,15 +509,15 @@ impl EmulatedSystem {
     ) -> Result<ValidatedBlock, (u8, u8)> {
         let position = list_error_index(index);
 
-        // "「サービスコードリスト順番」の値がサービス数を超えていないこと" -> A3h.
+        // "the Service Code List Order value does not exceed the number of services" -> A3h.
         let service_index = block.service_code_list_index as usize;
         let Some(service_code) = service_codes.get(service_index).copied() else {
             return Err((position, 0xA3));
         };
 
         // §4.4.5 permits access mode 000b only; §4.4.6 additionally permits 001b
-        // for a cashback write. Anything else is A7h (ブロックリスト不正:
-        // アクセスモード).
+        // for a cashback write. Anything else is A7h (illegal block list:
+        // access mode).
         let access_mode_allowed = match access {
             AccessType::Read => block.access_mode == 0b000,
             AccessType::Write => matches!(block.access_mode, 0b000 | 0b001),
@@ -526,8 +526,8 @@ impl EmulatedSystem {
             return Err((position, 0xA7));
         }
 
-        // "サービスコードリストで指定するアクセス先がエリアもしくはシステムではないこと".
-        // A4h is サービスタイプ不正, which table 4-12 defines as a wrong area *or*
+        // "the access target given in the service code list is not an area or system".
+        // A4h is "illegal service type", which table 4-12 defines as a wrong area *or*
         // service attribute — and an area code carries an area attribute, which is
         // never a valid service attribute, so this one test covers both.
         if service_code.raw() == SYSTEM_NODE_CODE {
@@ -537,23 +537,23 @@ impl EmulatedSystem {
             return Err((position, 0xA4));
         };
 
-        // "サービスコードリストで指定するサービスがシステム内に存在すること" -> A6h.
+        // "the service given in the service code list exists in the system" -> A6h.
         let Some(service) = self.find_service(service_code) else {
             return Err((position, 0xA6));
         };
 
-        // "サービスコードリストで指定するサービスのサービス属性が認証不要であること".
+        // "the service attribute of the service given in the service code list is authentication not required".
         if require_auth_free && service_code.requires_key() {
             return Err((position, 0xA5));
         }
 
         if matches!(access, AccessType::Write) {
-            // "サービス属性がリードオンリーではないこと".
+            // "the service attribute is not read-only".
             if !attribute.allows_write() {
                 return Err((position, 0xA5));
             }
-            // "アクセスモードに 001b が指定された場合、指定されたサービスのサービス属性
-            // が、パースサービスのキャッシュバック／デクリメントアクセスであること".
+            // "if access mode 001b is specified, the service attribute of the given service
+            // is purse service cashback/decrement access".
             if block.access_mode == 0b001 && !attribute.allows_cashback() {
                 return Err((position, 0xA5));
             }
@@ -561,7 +561,7 @@ impl EmulatedSystem {
             return Err((position, 0xA7));
         }
 
-        // "ブロック番号が、指定したサービスに設定されたブロック数の範囲内であること" -> A8h.
+        // "the block number is within the block count set for the given service" -> A8h.
         let block_number = block.block_number_or_key_version as usize;
         let block_count = service.blocks.borrow().len();
         if block_number >= block_count {
@@ -600,7 +600,7 @@ impl EmulatedSystem {
     ///
     /// Every element is validated and every new block computed before anything is
     /// stored, which is what gives §3.6.1's guarantee that a command's writes are
-    /// applied "完全に行われる" or not at all.
+    /// applied "completely" or not at all.
     pub(super) fn apply_block_writes(
         &self,
         service_codes: &[ServiceCode],
@@ -660,7 +660,7 @@ impl EmulatedSystem {
                     }
                 }
                 ServiceKind::Cyclic => {
-                    // "書き込み時は、常にブロック番号に 0 を指定する必要があります".
+                    // "when writing, block number 0 must always be specified".
                     if let Some((validated, _)) = run
                         .iter()
                         .find(|(validated, _)| validated.block_number != 0)

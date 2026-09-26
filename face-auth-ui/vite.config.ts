@@ -4,8 +4,8 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
   build: {
-    // Hi-CARA (Android 10) の AOSP WebView は Chromium 74。
-    // オプショナルチェーン等をトランスパイルするためターゲットを固定する。
+    // The AOSP WebView on Hi-CARA (Android 10) is Chromium 74.
+    // Pin the target so optional chaining etc. get transpiled.
     target: "chrome74",
     cssTarget: "chrome74",
   },

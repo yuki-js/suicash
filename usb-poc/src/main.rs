@@ -364,9 +364,9 @@ fn run(args: &Args) -> Result<Outcome> {
     // The interesting one: the proof is bound to *our* challenge, so it cannot
     // be replayed against a different session.
     ok &= check("proof is bound to this session's R1", pi_r1 == r1);
-    // attested_at が現在時刻から ±1 日以内か(オラクルの時計のドリフト信号)。
-    // epoch 秒なのでタイムゾーンには依存しない。旧実装は now を使わず
-    // `attested_at - 86400 >= attested_at` を評価しており常に false だった。
+    // Is attested_at within ±1 day of now? (signals oracle clock drift)
+    // Epoch seconds, so timezone-independent. The old implementation ignored now and
+    // evaluated `attested_at - 86400 >= attested_at`, which was always false.
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())

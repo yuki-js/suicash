@@ -1,29 +1,31 @@
-# site — SuiCash 紹介サイト
+# site — SuiCash landing page
 
-SuiCash のランディングページ。依存なしの静的 HTML 1 枚(`index.html`)で、
-ロゴ・カード券面・マスコットの SVG(`../assets/` 由来)をインラインで埋め込んでいる。
+The SuiCash landing page. A single dependency-free static HTML file (`index.html`) that inlines
+the logo, card face, and mascot SVGs (from `../assets/`).
 
-- フォント: REM + Noto Sans JP(Google Fonts)
-- ライト/ダークテーマ両対応(`prefers-color-scheme` + `data-theme` 上書き)
-- ビルド不要。ブラウザで `index.html` を開くだけで表示できる
-- 日英 2 言語対応。日本語は HTML の原文、英語は末尾スクリプトの `EN` 辞書
-  (`data-i18n` / `data-i18n-aria` / `data-i18n-content` / `data-i18n-alt` のキー)。
-  言語は `?lang=ja|en` → 前回の選択(localStorage)→ ブラウザ言語の順で決まり、ナビの JA/EN で切り替え。
-  文言を足すときは要素にキーを付け、`EN` に同じキーを追加する
-- `img/` の実機スクリーンショットは WebP(元 PNG から quality 82 で変換)
-- ローカル確認: `npx live-server --port=5500 site`(保存でライブリロード)
+- Fonts: REM + Noto Sans JP (Google Fonts)
+- Supports light/dark themes (`prefers-color-scheme` + `data-theme` override)
+- No build step. Just open `index.html` in a browser
+- Bilingual (Japanese/English). Japanese is the HTML source text; English lives in the `EN`
+  dictionary in the trailing script (keys via `data-i18n` / `data-i18n-aria` /
+  `data-i18n-content` / `data-i18n-alt`).
+  The language is picked from `?lang=ja|en` → the previous choice (localStorage) → the browser
+  language, in that order, and can be switched with JA/EN in the nav.
+  When adding text, put a key on the element and add the same key to `EN`
+- Device screenshots in `img/` are WebP (converted from the original PNGs at quality 82)
+- Local preview: `npx live-server --port=5500 site` (live reload on save)
 
-## 公開について
+## Publishing
 
-main の `site/**` か `regist-web/**` が更新されると、`.github/workflows/pages.yml` が
-両方を 1 つの成果物にまとめて GitHub Pages に公開する。
+When `site/**` or `regist-web/**` on main is updated, `.github/workflows/pages.yml` bundles
+both into one artifact and publishes it to GitHub Pages.
 
-- `/`      … このランディングページ(`site/` をそのままコピー。README は除外)
-- `/app/`  … 登録サイト(`regist-web` のビルド成果物)
+- `/`      … this landing page (`site/` copied as-is, excluding the README)
+- `/app/`  … the registration site (build output of `regist-web`)
 
-登録サイトがルートにあった頃のリンクで `?treasury=` / `?rpc=` / `?faucet=` が
-付いているものは、このページの先頭スクリプトが `/app/` へクエリごと転送する。
+Links from when the registration site lived at the root that carry `?treasury=` / `?rpc=` /
+`?faucet=` are forwarded, query included, to `/app/` by the script at the top of this page.
 
-## 注意
+## Notes
 
-`assets/` の SVG を更新したら、このページ内のインラインコピーも合わせて更新すること。
+When you update an SVG in `assets/`, update its inline copy in this page as well.

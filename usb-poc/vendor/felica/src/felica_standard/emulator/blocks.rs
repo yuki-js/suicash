@@ -38,7 +38,7 @@ const EXECUTION_ID: std::ops::Range<usize> = 12..16;
 
 /// Largest value a four-byte purse field can hold when it is *not* a limit purse
 /// service, i.e. when the field is a plain unsigned number (§4.5.2: a cashback
-/// result may not become "4 バイトを超える数字").
+/// result may not become "a number exceeding 4 bytes").
 const PURSE_MAX_UNSIGNED: i64 = u32::MAX as i64;
 
 type Block = [u8; BLOCK_SIZE];
@@ -81,8 +81,8 @@ impl PurseOperation {
 /// Reads a little-endian four-byte purse field.
 ///
 /// A limit purse service treats purse data as a two's-complement number
-/// (§3.4.4.1); an ordinary purse service treats it as unsigned (§3.4.4: "ブロック
-/// データの一部を正の数値とみなして").
+/// (§3.4.4.1); an ordinary purse service treats it as unsigned (§3.4.4: "treating
+/// part of the block data as a positive number").
 fn read_value(bytes: &[u8], signed: bool) -> i64 {
     let raw = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
     if signed {
@@ -206,7 +206,7 @@ pub(super) enum CyclicWrite {
 /// order, so its first element is the newest of the run.
 ///
 /// Writing more blocks to one cyclic service in a single command than the service
-/// owns is `AFh` (§4.5.2, table 4-12: 同時サイクリックライト過多).
+/// owns is `AFh` (§4.5.2, table 4-12: too many simultaneous cyclic writes).
 pub(super) fn apply_cyclic_write(
     stored: &[Block],
     command_blocks: &[Block],
@@ -300,7 +300,7 @@ mod tests {
         assert_eq!(&updated[8..12], &[0xAA; 4]);
     }
 
-    /// §4.5.2, table 4-11: 01h is "パースのデクリメント時に計算結果がゼロ未満になります".
+    /// §4.5.2, table 4-11: 01h is "the result of a purse decrement is less than zero".
     #[test]
     fn decrement_below_zero_is_status_flag_2_01h() {
         let stored = purse_block(100, 0, [0; 4], [0x00; 4]);
@@ -325,8 +325,8 @@ mod tests {
         assert_eq!(&updated[8..12], &[0xAA; 4]);
     }
 
-    /// Table 4-11: 02h is "パースのキャッシュバック時に、指定されたデータがキャッシュ
-    /// バックデータの値を超えています".
+    /// Table 4-11: 02h is "on a purse cashback, the specified data exceeds the
+    /// cashback data value".
     #[test]
     fn cashback_beyond_the_stored_amount_is_status_flag_2_02h() {
         let stored = purse_block(880, 120, [0; 4], [0x00; 4]);
@@ -337,8 +337,8 @@ mod tests {
         );
     }
 
-    /// Table 4-11: 01h also covers "パースのキャッシュバック時に計算結果が、4 バイトを
-    /// 超える数字になります".
+    /// Table 4-11: 01h also covers "on a purse cashback, the result is a number
+    /// exceeding 4 bytes".
     #[test]
     fn cashback_overflowing_four_bytes_is_status_flag_2_01h() {
         let stored = purse_block(u32::MAX - 5, 10, [0; 4], [0x00; 4]);
@@ -365,7 +365,7 @@ mod tests {
             Ok(None)
         );
 
-        // Table 3-7 marks direct access as "実行 ID ×", so it writes regardless.
+        // Table 3-7 marks direct access as "execution ID: ×", so it writes regardless.
         let direct = purse_block(500, 0, [0; 4], [0x07; 4]);
         assert!(
             apply_purse_write(&stored, &direct, PurseOperation::Direct, None)
@@ -508,7 +508,7 @@ mod tests {
         );
     }
 
-    /// Table 4-12: AFh is 同時サイクリックライト過多 — more simultaneous writes to one
+    /// Table 4-12: AFh is "too many simultaneous cyclic writes" — more simultaneous writes to one
     /// cyclic service than it has blocks.
     #[test]
     fn cyclic_write_longer_than_the_ring_is_status_flag_2_afh() {

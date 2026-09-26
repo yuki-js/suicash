@@ -13,7 +13,7 @@ pub const MAX_RW_SERVICE_CODES: usize = 0x10;
 ///
 /// This is the width of the block count field, which §4.4.5 and §4.4.6 define as
 /// one byte — not a limit on how many blocks a card will actually accept. The
-/// manual leaves 最大同時読み出し／書き込みブロック数 to each product, and even the
+/// manual leaves the maximum number of blocks read/written at once to each product, and even the
 /// most permissive product is bounded by what a single packet holds; see
 /// [`MAX_PACKET_LEN`] and [`MAX_READ_WITHOUT_ENCRYPTION_BLOCK_COUNT`].
 pub const MAX_BLOCK_COUNT: usize = 0xFF;
@@ -38,7 +38,7 @@ const READ_WITHOUT_ENCRYPTION_RESPONSE_OVERHEAD: usize = 1 + 1 + IDM_LEN + 1 + 1
 
 /// Most blocks a single Read Without Encryption can return.
 ///
-/// §4.4.5 makes 最大同時読み出しブロック数 product-specific, but no product can
+/// §4.4.5 makes the maximum number of blocks read at once product-specific, but no product can
 /// exceed what one response packet holds: 16 bytes per block on top of a fixed
 /// 13-byte header, against the [`MAX_PACKET_LEN`] ceiling of §2.2. Unlike a
 /// write, a read is limited by the *response* — the command itself stays small —

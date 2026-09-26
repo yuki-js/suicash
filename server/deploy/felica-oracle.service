@@ -1,12 +1,12 @@
-# FeliCa オラクル(server クレート)を Debian で常駐させる systemd ユニット。
-# 設置: /etc/systemd/system/felica-oracle.service
+# systemd unit that runs the FeliCa oracle (server crate) as a service on Debian.
+# Install to: /etc/systemd/system/felica-oracle.service
 #
-# 前提:
-#   - リポジトリを /opt/suicash に clone(-b usb-poc)
-#   - cargo build --release --manifest-path server/Cargo.toml --bin oracle 済み
-#   - 鍵は /etc/felica-oracle/keys.json(mode 600)に配置(リポジトリに入れない)
+# Prerequisites:
+#   - Repository cloned to /opt/suicash (-b usb-poc)
+#   - cargo build --release --manifest-path server/Cargo.toml --bin oracle already run
+#   - Keys placed at /etc/felica-oracle/keys.json (mode 600) (never in the repository)
 #
-# パス/ユーザーは環境に合わせて書き換えること。
+# Adjust paths/user to your environment.
 [Unit]
 Description=FeliCa IDi oracle (challenge/settle/attest)
 After=network-online.target
@@ -16,15 +16,15 @@ Wants=network-online.target
 Type=simple
 User=felica
 WorkingDirectory=/opt/suicash
-# 127.0.0.1 のみで待受(公開は cloudflared 経由。直接ポートは開けない)
+# Listen on 127.0.0.1 only (exposed via cloudflared; no ports opened directly)
 Environment=FELICA_BIND_ADDR=127.0.0.1:3000
 Environment=FELICA_PROVING_KEY_PATH=/opt/suicash/prover/assets/proving_key.bin
-# 鍵はファイル参照(mode 600 の Secret)。JSON を環境変数に直書きしない。
+# Keys are read from a file (mode 600 secret). Don't inline the JSON in an env var.
 Environment=FELICA_KEYS_JSON_FILE=/etc/felica-oracle/keys.json
 ExecStart=/opt/suicash/server/target/release/oracle
 Restart=always
 RestartSec=3
-# 証明生成は ~500MB/1回。メモリに余裕を持たせる(足りないと attest で落ちる)
+# Proof generation takes ~500MB per run. Leave headroom (attest crashes if short)
 # MemoryMax=2G
 
 [Install]

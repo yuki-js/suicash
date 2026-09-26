@@ -56,15 +56,15 @@ const AREA_NODE_IDS: &[u16] = &[0x0000, 0x0040, 0x0800, 0x0FC0, 0x1000];
 
 /// Service node IDs for Suica
 const REQUIRED_SERVICE_NODE_IDS: &[u16] = &[
-    0x0048, // 発行情報
-    0x0088, // 属性情報
-    0x0810, // その他（用途未確定）
-    0x08C8, // 最終チャージ情報
-    0x090C, // 取引履歴
-    0x1008, // 拡張情報（定期券番・定期発売額・オートチャージ等）
-    0x1048, // 定期情報
-    0x108C, // 改札入出場情報
-    0x10C8, // SF改札入場情報
+    0x0048, // Issue information
+    0x0088, // Attribute information
+    0x0810, // Other (purpose unknown)
+    0x08C8, // Last top-up information
+    0x090C, // Transaction history
+    0x1008, // Extended information (pass number, pass sale price, auto-charge, etc.)
+    0x1048, // Commuter pass information
+    0x108C, // Gate entry/exit information
+    0x10C8, // SF gate entry information
 ];
 
 /// Where each service sits in [`REQUIRED_SERVICE_NODE_IDS`]. A block read
@@ -79,101 +79,101 @@ const COMMUTER_SERVICE: u8 = 6;
 const GATE_SERVICE: u8 = 7;
 const SF_GATE_SERVICE: u8 = 8;
 
-/// 料金発券・改札情報. Not present on every card, so it is probed and appended
+/// Paid ticket / gate information. Not present on every card, so it is probed and appended
 /// to the authenticated list only when the card actually carries it.
 const PAID_TICKET_SERVICE_NODE_ID: u16 = 0x1848;
 
-/// Blocks the 拡張情報 service holds. The commuter pass extras live in the first
-/// two, the 通学証明書省略期限 in block 5 and the auto-charge settings in the last.
+/// Blocks the extended information service holds. The commuter pass extras live in the first
+/// two, the student certificate waiver expiry in block 5 and the auto-charge settings in the last.
 const EXTENDED_BLOCK_COUNT: usize = 10;
 
-/// Bit 6 of byte 9 in the 発行情報 metadata block marks the card as collected
-/// (取り込み済み), which also makes it invalid for further use.
+/// Bit 6 of byte 9 in the issue information metadata block marks the card as collected
+/// (taken in by the operator), which also makes it invalid for further use.
 const COLLECTED_FLAG_MASK: u8 = 1 << 6;
 
-/// Service setting bits in byte 8 of the 属性情報 block.
+/// Service setting bits in byte 8 of the attribute information block.
 const VOICE_GUIDANCE_MASK: u8 = 0x10;
 const SF_OUTSIDE_COMMUTER_MASK: u8 = 0x20;
 const TOUCH_DE_GO_MASK: u8 = 0x04;
 
-/// Purchase (物販) transactions store a clock instead of entry/exit stations.
+/// Purchase (retail) transactions store a clock instead of entry/exit stations.
 const PURCHASE_TRANSACTION_TYPE: u8 = 0x46;
 
 /// Equipment type descriptions
 fn equipment_type_to_str(equipment_type: u8) -> String {
     match equipment_type {
-        0x00 => "未定義".to_string(),
-        0x03 => "のりこし精算機".to_string(),
-        0x04 => "携帯端末".to_string(),
-        0x05 => "バス等車載機".to_string(),
-        0x07 => "カード発売機".to_string(),
-        0x08 => "自動券売機".to_string(),
-        0x09 => "SMART ICOCA クイックチャージ機?".to_string(),
-        0x12 => "自動券売機(東京モノレール)".to_string(),
-        0x14 => "駅務機器(PASMO発行機?)".to_string(),
-        0x15 => "定期券発売機".to_string(),
-        0x16 => "自動改札機".to_string(),
-        0x17 => "簡易改札機".to_string(),
-        0x18 => "駅務機器(発行機?)".to_string(),
-        0x19 => "窓口処理機(みどりの窓口)".to_string(),
-        0x1A => "窓口処理機(有人改札)".to_string(),
-        0x1B => "モバイルFeliCa".to_string(),
-        0x1C => "入場券券売機".to_string(),
-        0x1D => "他社乗換自動改札機".to_string(),
-        0x1F => "入金機".to_string(),
-        0x20 => "発行機?(モノレール)".to_string(),
-        0x22 => "簡易改札機(ことでん)".to_string(),
-        0x34 => "カード発売機(せたまる?)".to_string(),
-        0x35 => "バス等車載機(せたまる車内入金機?)".to_string(),
-        0x36 => "バス等車載機(車内簡易改札機)".to_string(),
-        0x46 => "ビューアルッテ端末".to_string(),
-        0xC7 | 0xC8 => "物販端末".to_string(),
-        _ => format!("不明な機器種別 (0x{:02X})", equipment_type),
+        0x00 => "Undefined".to_string(),
+        0x03 => "Fare adjustment machine".to_string(),
+        0x04 => "Handheld terminal".to_string(),
+        0x05 => "On-board unit (bus, etc.)".to_string(),
+        0x07 => "Card vending machine".to_string(),
+        0x08 => "Ticket vending machine".to_string(),
+        0x09 => "SMART ICOCA quick charge machine?".to_string(),
+        0x12 => "Ticket vending machine (Tokyo Monorail)".to_string(),
+        0x14 => "Station equipment (PASMO issuing machine?)".to_string(),
+        0x15 => "Commuter pass vending machine".to_string(),
+        0x16 => "Automatic ticket gate".to_string(),
+        0x17 => "Simple ticket gate".to_string(),
+        0x18 => "Station equipment (issuing machine?)".to_string(),
+        0x19 => "Counter terminal (Midori no Madoguchi)".to_string(),
+        0x1A => "Counter terminal (staffed gate)".to_string(),
+        0x1B => "Mobile FeliCa".to_string(),
+        0x1C => "Platform ticket vending machine".to_string(),
+        0x1D => "Transfer gate to other operator".to_string(),
+        0x1F => "Top-up machine".to_string(),
+        0x20 => "Issuing machine? (monorail)".to_string(),
+        0x22 => "Simple ticket gate (Kotoden)".to_string(),
+        0x34 => "Card vending machine (Setamaru?)".to_string(),
+        0x35 => "On-board unit (Setamaru on-board top-up?)".to_string(),
+        0x36 => "On-board unit (on-board simple gate)".to_string(),
+        0x46 => "VIEW ALTTE terminal".to_string(),
+        0xC7 | 0xC8 => "Retail terminal".to_string(),
+        _ => format!("Unknown equipment type (0x{:02X})", equipment_type),
     }
 }
 
 /// Transaction type descriptions
 fn transaction_type_to_str(transaction_type: u8) -> String {
     match transaction_type {
-        0x00 => "未定義".to_string(),
-        0x01 => "自動改札機出場".to_string(),
-        0x02 => "SFチャージ".to_string(),
-        0x03 => "きっぷ購入".to_string(),
-        0x04 => "磁気券精算".to_string(),
-        0x05 => "乗越精算".to_string(),
-        0x06 => "窓口出場".to_string(),
-        0x07 => "新規".to_string(),
-        0x08 => "控除".to_string(),
-        0x0D => "バス等均一運賃".to_string(),
-        0x0F => "バス等".to_string(),
-        0x11 => "再発行?".to_string(),
-        0x13 => "料金出場".to_string(),
-        0x14 => "オートチャージ".to_string(),
-        0x1F => "バス等チャージ".to_string(),
-        0x46 => "物販".to_string(),
-        0x48 => "ポイントチャージ".to_string(),
-        0x4B => "入場・物販".to_string(),
-        _ => format!("不明な取引種別 (0x{:02X})", transaction_type),
+        0x00 => "Undefined".to_string(),
+        0x01 => "Exit via automatic gate".to_string(),
+        0x02 => "SF top-up".to_string(),
+        0x03 => "Ticket purchase".to_string(),
+        0x04 => "Magnetic ticket fare adjustment".to_string(),
+        0x05 => "Excess fare adjustment".to_string(),
+        0x06 => "Exit at counter".to_string(),
+        0x07 => "New issue".to_string(),
+        0x08 => "Deduction".to_string(),
+        0x0D => "Flat fare (bus, etc.)".to_string(),
+        0x0F => "Bus, etc.".to_string(),
+        0x11 => "Reissue?".to_string(),
+        0x13 => "Exit with surcharge".to_string(),
+        0x14 => "Auto-charge".to_string(),
+        0x1F => "Top-up (bus, etc.)".to_string(),
+        0x46 => "Retail purchase".to_string(),
+        0x48 => "Point top-up".to_string(),
+        0x4B => "Entry / retail purchase".to_string(),
+        _ => format!("Unknown transaction type (0x{:02X})", transaction_type),
     }
 }
 
 /// Pay type descriptions
 fn pay_type_to_str(pay_type: u8) -> String {
     match pay_type {
-        0x00 => "現金/なし".to_string(),
+        0x00 => "Cash / none".to_string(),
         0x02 => "VIEW".to_string(),
         0x0B => "PiTaPa".to_string(),
-        0x0D => "オートチャージ対応PASMO".to_string(),
-        0x3F => "モバイルSuica(VIEW決済以外)".to_string(),
-        _ => format!("不明な支払種別 (0x{:02X})", pay_type),
+        0x0D => "PASMO with auto-charge".to_string(),
+        0x3F => "Mobile Suica (non-VIEW payment)".to_string(),
+        _ => format!("Unknown pay type (0x{:02X})", pay_type),
     }
 }
 
-/// 定期券・企画券の購入支払種別。取引履歴の支払種別と同じコード体系だが、
-/// 0x3F は「クレジットカード」の意味で使われる。
+/// Pay type used to purchase commuter passes / special tickets. Same code space as the
+/// transaction history pay type, but 0x3F means "credit card".
 fn purchase_pay_type_to_str(pay_type: u8) -> String {
     if pay_type == 0x3F {
-        return "クレジットカード".to_string();
+        return "Credit card".to_string();
     }
     pay_type_to_str(pay_type)
 }
@@ -181,62 +181,62 @@ fn purchase_pay_type_to_str(pay_type: u8) -> String {
 /// Gate instruction type descriptions
 fn gate_instruction_type_to_str(gate_instruction_type: u8) -> String {
     match gate_instruction_type {
-        0x00 => "未定義".to_string(),
-        0x01 => "入場".to_string(),
-        0x02 => "入場/出場".to_string(),
-        0x03 => "定期入場/出場".to_string(),
-        0x04 => "入場/定期出場".to_string(),
-        0x0E => "窓口出場".to_string(),
-        0x0F => "入場/出場(バス等)".to_string(),
-        0x12 => "料金定期入場/料金出場".to_string(),
-        0x17 => "入場/出場(乗継割引)".to_string(),
-        0x21 => "入場/出場(バス等乗継割引)".to_string(),
-        _ => format!("不明な改札処理種別 (0x{:02X})", gate_instruction_type),
+        0x00 => "Undefined".to_string(),
+        0x01 => "Entry".to_string(),
+        0x02 => "Entry/exit".to_string(),
+        0x03 => "Pass entry/exit".to_string(),
+        0x04 => "Entry/pass exit".to_string(),
+        0x0E => "Exit at counter".to_string(),
+        0x0F => "Entry/exit (bus, etc.)".to_string(),
+        0x12 => "Surcharge pass entry/surcharge exit".to_string(),
+        0x17 => "Entry/exit (transfer discount)".to_string(),
+        0x21 => "Entry/exit (bus transfer discount)".to_string(),
+        _ => format!("Unknown gate instruction type (0x{:02X})", gate_instruction_type),
     }
 }
 
 /// Gate in/out type descriptions
 fn gate_in_out_type_to_str(gate_in_out_type: u8) -> String {
     match gate_in_out_type {
-        0x00 => "精算出場".to_string(),
-        0x01 => "精算出場(プリペイドカード併用?)".to_string(),
-        0x20 => "出場".to_string(),
-        0x21 => "駅務機器出場".to_string(),
-        0x22 => "割引出場".to_string(),
-        0x24 => "割引出場?".to_string(),
-        0x40 => "定期出場".to_string(),
-        0x80 => "均一区間入場?".to_string(),
-        0xA0 => "入場".to_string(),
-        0xA2 => "割引入場?".to_string(),
-        0xC0 => "定期入場".to_string(),
-        _ => format!("不明な改札入出場種別 (0x{:02X})", gate_in_out_type),
+        0x00 => "Exit with fare adjustment".to_string(),
+        0x01 => "Exit with fare adjustment (with prepaid card?)".to_string(),
+        0x20 => "Exit".to_string(),
+        0x21 => "Exit via station equipment".to_string(),
+        0x22 => "Discounted exit".to_string(),
+        0x24 => "Discounted exit?".to_string(),
+        0x40 => "Pass exit".to_string(),
+        0x80 => "Flat-fare zone entry?".to_string(),
+        0xA0 => "Entry".to_string(),
+        0xA2 => "Discounted entry?".to_string(),
+        0xC0 => "Pass entry".to_string(),
+        _ => format!("Unknown gate entry/exit type (0x{:02X})", gate_in_out_type),
     }
 }
 
 /// Intermediate gate instruction type descriptions
 fn intermediate_gate_instruction_type_to_str(gate_instruction_type: u8) -> String {
     match gate_instruction_type {
-        0x00 => "未定義".to_string(),
-        0x04 => "乗継割引?".to_string(),
-        0x08 => "電車バス乗継割引?".to_string(),
-        0x40 => "新幹線中間改札?".to_string(),
-        _ => format!("不明な中間改札処理種別 (0x{:02X})", gate_instruction_type),
+        0x00 => "Undefined".to_string(),
+        0x04 => "Transfer discount?".to_string(),
+        0x08 => "Rail-bus transfer discount?".to_string(),
+        0x40 => "Shinkansen transfer gate?".to_string(),
+        _ => format!("Unknown intermediate gate instruction type (0x{:02X})", gate_instruction_type),
     }
 }
 
 /// Issuer ID information (company name, identifier)
 fn issuer_id_info(issuer_id: u16) -> Option<(&'static str, &'static str)> {
     match issuer_id {
-        0x0102 => Some(("北海道旅客鉄道株式会社", "JH")),
-        0x0103 => Some(("東日本旅客鉄道株式会社", "JE")),
-        0x0104 => Some(("東海旅客鉄道株式会社", "JC")),
-        0x0105 => Some(("西日本旅客鉄道株式会社", "JW")),
-        0x0107 => Some(("九州旅客鉄道株式会社", "JK")),
-        0x0252 => Some(("株式会社パスモ", "PB")),
-        0x0387 => Some(("株式会社名古屋交通開発機構・株式会社エムアイシー", "TP")),
-        0x04AD => Some(("株式会社スルッとKANSAI", "SU")),
-        0x05D5 => Some(("株式会社ニモカ", "NR")),
-        0x05D7 => Some(("福岡市交通局", "FC")),
+        0x0102 => Some(("Hokkaido Railway Company", "JH")),
+        0x0103 => Some(("East Japan Railway Company", "JE")),
+        0x0104 => Some(("Central Japan Railway Company", "JC")),
+        0x0105 => Some(("West Japan Railway Company", "JW")),
+        0x0107 => Some(("Kyushu Railway Company", "JK")),
+        0x0252 => Some(("PASMO Co., Ltd.", "PB")),
+        0x0387 => Some(("Nagoya Transportation Development Organization / MIC Co., Ltd.", "TP")),
+        0x04AD => Some(("Surutto KANSAI Co., Ltd.", "SU")),
+        0x05D5 => Some(("nimoca Co., Ltd.", "NR")),
+        0x05D7 => Some(("Fukuoka City Transportation Bureau", "FC")),
         _ => None,
     }
 }
@@ -386,15 +386,15 @@ fn thousands(value: i64) -> String {
 
 /// Format an integer amount as yen with thousands separators.
 fn format_yen(value: impl Into<i64>) -> String {
-    format!("{} 円", thousands(value.into()))
+    format!("{} JPY", thousands(value.into()))
 }
 
 /// Format a balance change, signed, or a dash when there is nothing to compare
 /// against.
 fn format_delta(value: Option<i64>) -> String {
     match value {
-        Some(value) if value > 0 => format!("+{} 円", thousands(value)),
-        Some(value) => format!("{} 円", thousands(value)),
+        Some(value) if value > 0 => format!("+{} JPY", thousands(value)),
+        Some(value) => format!("{} JPY", thousands(value)),
         None => "—".to_string(),
     }
 }
@@ -509,7 +509,7 @@ impl StationCodeLookup {
                 info.company_name, info.line_name, info.station_name
             ),
             None => format!(
-                "不明 (線区コード: 0x{:02X}, 駅順コード: 0x{:02X})",
+                "Unknown (line code: 0x{:02X}, station order code: 0x{:02X})",
                 line_code, station_order
             ),
         }
@@ -532,7 +532,7 @@ fn format_station(line_code: u8, station_order: u8) -> String {
         if let Some(ref lookup) = *lookup.borrow() {
             lookup.format_station(line_code, station_order)
         } else {
-            format!("線区: 0x{:02X}, 駅順: 0x{:02X}", line_code, station_order)
+            format!("Line: 0x{:02X}, station order: 0x{:02X}", line_code, station_order)
         }
     })
 }
@@ -756,7 +756,7 @@ fn run_with_driver<D: FelicaDriver + ?Sized>(
     let idm_hex = encode_upper(felica.idm());
     let pmm_hex = encode_upper(felica.pmm());
 
-    print_section("カード識別");
+    print_section("Card identification");
     print_item("IDm", &idm_hex);
     print_item("PMm", &pmm_hex);
 
@@ -773,20 +773,20 @@ fn run_with_driver<D: FelicaDriver + ?Sized>(
                 auth_service_node_ids.push(PAID_TICKET_SERVICE_NODE_ID);
             } else {
                 paid_ticket_skip_reason = Some(format!(
-                    "Service 0x{:04X} は存在しますが鍵が不足しているためスキップしました",
+                    "Service 0x{:04X} exists but was skipped due to missing keys",
                     PAID_TICKET_SERVICE_NODE_ID
                 ));
             }
         }
         Ok(false) => {
             paid_ticket_skip_reason = Some(format!(
-                "カードに Service 0x{:04X} が存在しないためスキップしました",
+                "Skipped because the card has no Service 0x{:04X}",
                 PAID_TICKET_SERVICE_NODE_ID
             ));
         }
         Err(err) => {
             paid_ticket_skip_reason = Some(format!(
-                "Service 0x{:04X} の存在確認に失敗したためスキップしました: {}",
+                "Skipped because checking for Service 0x{:04X} failed: {}",
                 PAID_TICKET_SERVICE_NODE_ID, err
             ));
         }
@@ -810,7 +810,7 @@ fn run_with_driver<D: FelicaDriver + ?Sized>(
 }
 
 fn print_paid_ticket_skip_message(reason: &str) {
-    print_section("料金発券・改札情報");
+    print_section("Paid ticket / gate information");
     print_note(reason);
 }
 
@@ -825,7 +825,7 @@ fn read_and_print_suica_data<D: FelicaDriver + ?Sized>(
     print_unknown_information(felica)?;
     print_transaction_history(felica)?;
 
-    // 定期券の付加情報とオートチャージ設定は同じ拡張情報サービスに載っている。
+    // Commuter pass extras and auto-charge settings live in the same extended information service.
     let extended_blocks = read_blocks(felica, EXTENDED_SERVICE, EXTENDED_BLOCK_COUNT)?;
     print_commuter_pass_information(felica, &extended_blocks)?;
     print_auto_charge_information(&extended_blocks);
@@ -874,11 +874,11 @@ fn read_blocks<D: FelicaDriver + ?Sized>(
 fn print_issue_information<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
 ) -> Result<(), FelicaStandardError> {
-    print_section("発行情報");
+    print_section("Issue information");
 
     let blocks = read_blocks(felica, ISSUE_SERVICE, 4)?;
     if blocks.len() < 4 {
-        print_note("データが不十分です");
+        print_note("Insufficient data");
         return Ok(());
     }
 
@@ -888,50 +888,50 @@ fn print_issue_information<D: FelicaDriver + ?Sized>(
     let metadata_block = &blocks[3];
 
     // Owner name (Shift_JIS encoded)
-    print_item("所有者名", decode_owner_name(owner_block));
+    print_item("Owner name", decode_owner_name(owner_block));
 
     // Secondary IDi
-    print_item("第二発行ID", idi_bytes_to_str(secondary_idi_block));
+    print_item("Secondary IDi", idi_bytes_to_str(secondary_idi_block));
 
     // Phone number
     let phone = encode_upper(&personal_block[0..8])
         .trim_end_matches('F')
         .to_string();
-    print_item("所有者電話番号", phone);
+    print_item("Owner phone number", phone);
 
     // Owner age
-    print_item("所有者年齢", encode_upper(&personal_block[8..9]));
+    print_item("Owner age", encode_upper(&personal_block[8..9]));
 
     // Owner date of birth
-    print_item("所有者生年月日", format_birth_date(be16(personal_block, 9)));
+    print_item("Owner date of birth", format_birth_date(be16(personal_block, 9)));
 
     // Deposit
-    print_item("デポジット額", format_yen(le16(personal_block, 12)));
+    print_item("Deposit", format_yen(le16(personal_block, 12)));
 
     // Issuer ID
-    print_item("発行者ID", issuer_id_to_str(be16(metadata_block, 0)));
+    print_item("Issuer ID", issuer_id_to_str(be16(metadata_block, 0)));
 
     // Equipment type
     let issued_by = metadata_block[2];
-    print_item("発行機器", equipment_type_to_str(issued_by));
+    print_item("Issuing equipment", equipment_type_to_str(issued_by));
 
     // Issue station
     let issued_station_line = metadata_block[3];
     let issued_station_order = metadata_block[4];
     print_item(
-        "発行駅",
+        "Issuing station",
         format_station(issued_station_line, issued_station_order),
     );
 
     // Issue date
-    print_item("発行日", format_date(be16(metadata_block, 7)));
+    print_item("Issue date", format_date(be16(metadata_block, 7)));
 
     // Expiration date
-    print_item("有効期限", format_date(be16(metadata_block, 14)));
+    print_item("Expiry date", format_date(be16(metadata_block, 14)));
 
-    // Collected (取り込み済み) cards are invalid for further use.
+    // Collected cards are invalid for further use.
     if metadata_block[9] & COLLECTED_FLAG_MASK != 0 {
-        print_item("取り込み済み", "はい（無効カード）");
+        print_item("Collected", "Yes (invalid card)");
     }
 
     Ok(())
@@ -940,38 +940,38 @@ fn print_issue_information<D: FelicaDriver + ?Sized>(
 fn print_attribute_information<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
 ) -> Result<(), FelicaStandardError> {
-    print_section("属性情報");
+    print_section("Attribute information");
 
     let blocks = read_blocks(felica, ATTRIBUTE_SERVICE, 1)?;
     if blocks.is_empty() {
-        print_note("データが不十分です");
+        print_note("Insufficient data");
         return Ok(());
     }
 
     let block = &blocks[0];
 
-    print_item("残高", format_yen(le16(block, 11)));
-    print_item("取引通番", be16(block, 14));
+    print_item("Balance", format_yen(le16(block, 11)));
+    print_item("Transaction sequence number", be16(block, 14));
 
     // Byte 8 carries the service settings the card holder can toggle.
     let settings = block[8];
     let use_str = |enabled: bool| {
         if enabled {
-            "利用する"
+            "Enabled"
         } else {
-            "利用しない"
+            "Disabled"
         }
     };
     print_item(
-        "音声案内サービス",
+        "Voice guidance service",
         use_str(settings & VOICE_GUIDANCE_MASK != 0),
     );
     print_item(
-        "定期有効期間外のSF利用",
+        "SF use outside commuter pass validity",
         use_str(settings & SF_OUTSIDE_COMMUTER_MASK != 0),
     );
     print_item(
-        "タッチでGo！新幹線",
+        "Touch de Go! Shinkansen",
         use_str(settings & TOUCH_DE_GO_MASK != 0),
     );
 
@@ -981,27 +981,27 @@ fn print_attribute_information<D: FelicaDriver + ?Sized>(
 fn print_last_topup_information<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
 ) -> Result<(), FelicaStandardError> {
-    print_section("最終チャージ情報");
+    print_section("Last top-up information");
 
     let blocks = read_blocks(felica, TOPUP_SERVICE, 3)?;
     if blocks.is_empty() {
-        print_note("データがありません");
+        print_note("No data");
         return Ok(());
     }
 
     let detail_block = &blocks[0];
 
     let topup_by = detail_block[0];
-    print_item("チャージ機器", equipment_type_to_str(topup_by));
+    print_item("Top-up equipment", equipment_type_to_str(topup_by));
 
     let topup_station_line = detail_block[1];
     let topup_station_order = detail_block[2];
     print_item(
-        "チャージ駅",
+        "Top-up station",
         format_station(topup_station_line, topup_station_order),
     );
 
-    print_item("チャージ金額", format_yen(le16(detail_block, 5)));
+    print_item("Top-up amount", format_yen(le16(detail_block, 5)));
 
     Ok(())
 }
@@ -1009,19 +1009,19 @@ fn print_last_topup_information<D: FelicaDriver + ?Sized>(
 fn print_unknown_information<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
 ) -> Result<(), FelicaStandardError> {
-    print_section("その他情報（用途未確定）");
+    print_section("Other information (purpose unknown)");
 
     let blocks = read_blocks(felica, MISC_SERVICE, 1)?;
     if blocks.is_empty() {
-        print_note("データがありません");
+        print_note("No data");
         return Ok(());
     }
 
     let block = &blocks[0];
 
-    print_item("不明な残高", format_yen(le16(block, 0)));
-    print_item("不明な日付", format_date(be16(block, 8)));
-    print_item("不明な取引通番", be16(block, 14));
+    print_item("Unknown balance", format_yen(le16(block, 0)));
+    print_item("Unknown date", format_date(be16(block, 8)));
+    print_item("Unknown transaction sequence number", be16(block, 14));
 
     Ok(())
 }
@@ -1029,7 +1029,7 @@ fn print_unknown_information<D: FelicaDriver + ?Sized>(
 fn print_transaction_history<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
 ) -> Result<(), FelicaStandardError> {
-    print_section("取引履歴");
+    print_section("Transaction history");
 
     let blocks = read_blocks(felica, HISTORY_SERVICE, 20)?;
     // Unwritten slots read back as zero, and every slot past the first one is
@@ -1039,7 +1039,7 @@ fn print_transaction_history<D: FelicaDriver + ?Sized>(
         .take_while(|block| block[0] != 0x00)
         .collect();
     if entries.is_empty() {
-        print_note("履歴がありません");
+        print_note("No history");
         return Ok(());
     }
 
@@ -1050,28 +1050,28 @@ fn print_transaction_history<D: FelicaDriver + ?Sized>(
         let gate_instruction_type = block[3];
 
         println!("[{:02}] {}", index, format_date(be16(block, 4)));
-        print_item("機器", equipment_type_to_str(recorded_by));
-        print_item("取引種別", transaction_type_to_str(transaction_type));
-        print_item("支払種別", pay_type_to_str(pay_type));
+        print_item("Equipment", equipment_type_to_str(recorded_by));
+        print_item("Transaction type", transaction_type_to_str(transaction_type));
+        print_item("Pay type", pay_type_to_str(pay_type));
         print_item(
-            "改札処理",
+            "Gate instruction",
             gate_instruction_type_to_str(gate_instruction_type),
         );
 
         if transaction_type == PURCHASE_TRANSACTION_TYPE {
-            // 物販は経路の代わりに時刻を記録する。
-            print_item("取引時刻", format_time(be16(block, 6)));
+            // Retail purchases record a time instead of a route.
+            print_item("Transaction time", format_time(be16(block, 6)));
         } else {
             let entry_station_line = block[6];
             let entry_station_order = block[7];
             let exit_station_line = block[8];
             let exit_station_order = block[9];
             print_item(
-                "入場駅",
+                "Entry station",
                 format_station(entry_station_line, entry_station_order),
             );
             print_item(
-                "出場駅",
+                "Exit station",
                 format_station(exit_station_line, exit_station_order),
             );
         }
@@ -1083,9 +1083,9 @@ fn print_transaction_history<D: FelicaDriver + ?Sized>(
         let delta = entries
             .get(index + 1)
             .map(|older| i64::from(balance) - i64::from(le16(older, 10)));
-        print_item("残高", format_yen(balance));
-        print_item("差額", format_delta(delta));
-        print_item("取引通番", be16(block, 13));
+        print_item("Balance", format_yen(balance));
+        print_item("Difference", format_delta(delta));
+        print_item("Transaction sequence number", be16(block, 13));
         println!();
     }
 
@@ -1096,11 +1096,11 @@ fn print_commuter_pass_information<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
     extended_blocks: &[[u8; 16]],
 ) -> Result<(), FelicaStandardError> {
-    print_section("定期情報");
+    print_section("Commuter pass information");
 
     let blocks = read_blocks(felica, COMMUTER_SERVICE, 3)?;
     if blocks.len() < 3 {
-        print_note("データが不十分です");
+        print_note("Insufficient data");
         return Ok(());
     }
 
@@ -1109,112 +1109,112 @@ fn print_commuter_pass_information<D: FelicaDriver + ?Sized>(
 
     let start_at = format_date(be16(primary_block, 0));
     if start_at == "—" {
-        print_note("定期券なし");
+        print_note("No commuter pass");
         return Ok(());
     }
 
-    // 発行事業者・券番・発売額などは拡張情報サービス側に載っている。
+    // Issuer, pass number, sale price, etc. live in the extended information service.
     if extended_blocks.len() >= EXTENDED_BLOCK_COUNT {
-        print_item("発行事業者", issuer_id_to_str(be16(&extended_blocks[0], 0)));
+        print_item("Issuer", issuer_id_to_str(be16(&extended_blocks[0], 0)));
     }
 
-    print_item("開始日", start_at);
-    print_item("終了日", format_date(be16(primary_block, 2)));
+    print_item("Start date", start_at);
+    print_item("End date", format_date(be16(primary_block, 2)));
 
     let start_station_line = primary_block[8];
     let start_station_order = primary_block[9];
     print_item(
-        "始点駅",
+        "Origin station",
         format_station(start_station_line, start_station_order),
     );
 
     let end_station_line = primary_block[10];
     let end_station_order = primary_block[11];
     print_item(
-        "終点駅",
+        "Destination station",
         format_station(end_station_line, end_station_order),
     );
 
     let via1_station_line = primary_block[12];
     let via1_station_order = primary_block[13];
     print_item(
-        "経由駅1",
+        "Via station 1",
         format_station(via1_station_line, via1_station_order),
     );
 
     let via2_station_line = primary_block[14];
     let via2_station_order = primary_block[15];
     print_item(
-        "経由駅2",
+        "Via station 2",
         format_station(via2_station_line, via2_station_order),
     );
 
-    print_item("発行日", format_date(be16(supplemental_block, 5)));
+    print_item("Issue date", format_date(be16(supplemental_block, 5)));
 
     if extended_blocks.len() < EXTENDED_BLOCK_COUNT {
-        print_note("拡張情報が読めなかったため券番・発売額などは省略しました");
+        print_note("Pass number, sale price, etc. omitted because extended information could not be read");
         return Ok(());
     }
 
-    // 券番は拡張情報ブロック0の末尾からブロック1の先頭にまたがる BCD 6 桁。
+    // The pass number is 6 BCD digits spanning the end of extended block 0 and the start of block 1.
     let pass_number = decode_bcd(&[
         extended_blocks[0][15],
         extended_blocks[1][0],
         extended_blocks[1][1],
     ]);
-    print_item("券番", pass_number);
+    print_item("Pass number", pass_number);
 
-    // 発売額は 3 バイトのリトルエンディアン。
+    // The sale price is 3 bytes, little-endian.
     let sale_price = u32::from_le_bytes([
         extended_blocks[1][7],
         extended_blocks[1][8],
         extended_blocks[1][9],
         0,
     ]);
-    print_item("発売額", format_yen(sale_price));
+    print_item("Sale price", format_yen(sale_price));
 
     let purchase_pay_type = extended_blocks[1][6];
     print_item(
-        "購入時支払方法",
+        "Purchase payment method",
         purchase_pay_type_to_str(purchase_pay_type),
     );
 
-    // R 通番は BCD 4 桁のうち下 3 桁。
+    // The R number is the lower 3 of 4 BCD digits.
     let r_number: String = decode_bcd(&extended_blocks[1][10..12])
         .chars()
         .skip(1)
         .collect();
-    print_item("R通番", r_number);
+    print_item("R number", r_number);
 
-    // 通学証明書省略期限は学生定期のみ。
+    // The student certificate waiver expiry applies to student passes only.
     let certificate_expiry = format_date(be16(&extended_blocks[5], 10));
     if certificate_expiry != "—" {
-        print_item("通学証明書省略期限", certificate_expiry);
+        print_item("Student certificate waiver expiry", certificate_expiry);
     }
 
     Ok(())
 }
 
 fn print_auto_charge_information(extended_blocks: &[[u8; 16]]) {
-    print_section("オートチャージ");
+    print_section("Auto-charge");
 
     let Some(block) = extended_blocks.get(EXTENDED_BLOCK_COUNT - 1) else {
-        print_note("データがありません");
+        print_note("No data");
         return;
     };
 
     let contracted = (block[0] >> 7) & 1 == 1;
     let enabled = (block[0] >> 6) & 1 == 1;
-    let yes_no = |value: bool| if value { "有" } else { "無" };
+    let yes_no = |value: bool| if value { "Yes" } else { "No" };
 
-    print_item("契約", yes_no(contracted));
-    print_item("有効", yes_no(enabled));
+    print_item("Contracted", yes_no(contracted));
+    print_item("Enabled", yes_no(enabled));
 
     if contracted {
-        // チャージ額としきい値はどちらも 1000 円単位。
-        print_item("チャージ額", format_yen(u16::from(block[0] & 0x0F) * 1000));
+        // Top-up amount and threshold are both in units of 1,000 JPY.
+        print_item("Top-up amount", format_yen(u16::from(block[0] & 0x0F) * 1000));
         print_item(
-            "しきい値",
+            "Threshold",
             format_yen(u16::from((block[1] >> 2) & 0x0F) * 1000),
         );
     }
@@ -1223,7 +1223,7 @@ fn print_auto_charge_information(extended_blocks: &[[u8; 16]]) {
 fn print_gate_in_out_information<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
 ) -> Result<(), FelicaStandardError> {
-    print_section("改札入出場情報");
+    print_section("Gate entry/exit information");
 
     let blocks = read_blocks(felica, GATE_SERVICE, 3)?;
     // Unused slots come back zero-filled; skipping them keeps phantom rows out
@@ -1234,7 +1234,7 @@ fn print_gate_in_out_information<D: FelicaDriver + ?Sized>(
         .filter(|(_, block)| !is_blank(block))
         .collect();
     if entries.is_empty() {
-        print_note("記録がありません");
+        print_note("No records");
         return Ok(());
     }
 
@@ -1249,26 +1249,26 @@ fn print_gate_in_out_information<D: FelicaDriver + ?Sized>(
         );
 
         let gate_in_out_type = block[0];
-        print_item("改札入出場種別", gate_in_out_type_to_str(gate_in_out_type));
+        print_item("Gate entry/exit type", gate_in_out_type_to_str(gate_in_out_type));
 
         let intermediate_gate_type = block[1];
         print_item(
-            "中間改札処理種別",
+            "Intermediate gate instruction type",
             intermediate_gate_instruction_type_to_str(intermediate_gate_type),
         );
 
         let station_line = block[2];
         let station_order = block[3];
-        print_item("入出場駅", format_station(station_line, station_order));
+        print_item("Entry/exit station", format_station(station_line, station_order));
 
-        print_item("装置番号", encode_upper(&block[4..6]));
-        print_item("金額", format_yen(le16(block, 10)));
-        print_item("最寄定期区間までの運賃", format_yen(le16(block, 12)));
+        print_item("Device number", encode_upper(&block[4..6]));
+        print_item("Amount", format_yen(le16(block, 10)));
+        print_item("Fare to nearest pass section", format_yen(le16(block, 12)));
 
         let nearest_station_line = block[14];
         let nearest_station_order = block[15];
         print_item(
-            "最寄定期区間の駅",
+            "Nearest pass section station",
             format_station(nearest_station_line, nearest_station_order),
         );
 
@@ -1281,11 +1281,11 @@ fn print_gate_in_out_information<D: FelicaDriver + ?Sized>(
 fn print_sf_gate_entry_information<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
 ) -> Result<(), FelicaStandardError> {
-    print_section("SF改札入場情報");
+    print_section("SF gate entry information");
 
     let blocks = read_blocks(felica, SF_GATE_SERVICE, 2)?;
     if blocks.len() < 2 {
-        print_note("データが不十分です");
+        print_note("Insufficient data");
         return Ok(());
     }
 
@@ -1293,57 +1293,57 @@ fn print_sf_gate_entry_information<D: FelicaDriver + ?Sized>(
     let second_block = &blocks[1];
 
     if is_blank(first_block) && is_blank(second_block) {
-        print_note("記録がありません");
+        print_note("No records");
         return Ok(());
     }
 
     let entry_station_line = first_block[0];
     let entry_station_order = first_block[1];
     print_item(
-        "入場駅",
+        "Entry station",
         format_station(entry_station_line, entry_station_order),
     );
 
     print_item(
-        "料金収受対象中間改札入出場日付",
+        "Chargeable intermediate gate entry/exit date",
         format_date(be16(second_block, 0)),
     );
 
     let entry_time = encode(&second_block[2..4]);
     print_item(
-        "中間改札入場時刻",
+        "Intermediate gate entry time",
         format!("{}:{}", &entry_time[0..2], &entry_time[2..4]),
     );
 
     let intermediate_entry_station_line = second_block[4];
     let intermediate_entry_station_order = second_block[5];
     print_item(
-        "中間改札入場駅",
+        "Intermediate gate entry station",
         format_station(
             intermediate_entry_station_line,
             intermediate_entry_station_order,
         ),
     );
 
-    print_item("不明値1", format!("0x{:02X}", second_block[6]));
+    print_item("Unknown value 1", format!("0x{:02X}", second_block[6]));
 
     let exit_time = encode(&second_block[7..9]);
     print_item(
-        "中間改札出場時刻",
+        "Intermediate gate exit time",
         format!("{}:{}", &exit_time[0..2], &exit_time[2..4]),
     );
 
     let intermediate_exit_station_line = second_block[9];
     let intermediate_exit_station_order = second_block[10];
     print_item(
-        "中間改札出場駅",
+        "Intermediate gate exit station",
         format_station(
             intermediate_exit_station_line,
             intermediate_exit_station_order,
         ),
     );
 
-    print_item("不明値2", format!("0x{:02X}", second_block[11]));
+    print_item("Unknown value 2", format!("0x{:02X}", second_block[11]));
 
     Ok(())
 }
@@ -1352,7 +1352,7 @@ fn print_paid_ticket_issue_information<D: FelicaDriver + ?Sized>(
     felica: &mut FelicaStandard<D>,
     service_index: u8,
 ) -> Result<(), FelicaStandardError> {
-    print_section("料金発券・改札情報");
+    print_section("Paid ticket / gate information");
 
     let blocks = read_blocks(felica, service_index, 2)?;
     let entries: Vec<(usize, [u8; 16])> = blocks
@@ -1361,7 +1361,7 @@ fn print_paid_ticket_issue_information<D: FelicaDriver + ?Sized>(
         .filter(|(_, block)| !is_blank(block))
         .collect();
     if entries.is_empty() {
-        print_note("記録がありません");
+        print_note("No records");
         return Ok(());
     }
 
@@ -1371,34 +1371,34 @@ fn print_paid_ticket_issue_information<D: FelicaDriver + ?Sized>(
         let depart_station_line = block[0];
         let depart_station_order = block[1];
         print_item(
-            "発駅",
+            "Departure station",
             format_station(depart_station_line, depart_station_order),
         );
 
         let arrive_station_line = block[2];
         let arrive_station_order = block[3];
         print_item(
-            "着駅",
+            "Arrival station",
             format_station(arrive_station_line, arrive_station_order),
         );
 
-        print_item("有効期限", format_date(be16(block, 4)));
-        print_item("発券時間", format_time(be16(block, 6)));
-        print_item("発券種別", encode_upper(&block[8..9]));
+        print_item("Expiry date", format_date(be16(block, 4)));
+        print_item("Issue time", format_time(be16(block, 6)));
+        print_item("Ticket type", encode_upper(&block[8..9]));
 
-        // 金額は 10 円単位で 1 バイトに収められている。
-        print_item("金額", format_yen(u16::from(block[9]) * 10));
+        // The amount is stored in one byte in units of 10 JPY.
+        print_item("Amount", format_yen(u16::from(block[9]) * 10));
 
-        print_item("装置番号", encode_upper(&block[10..12]));
+        print_item("Device number", encode_upper(&block[10..12]));
 
         let checked_station_line = block[12];
         let checked_station_order = block[13];
         print_item(
-            "改札実施駅",
+            "Gate station",
             format_station(checked_station_line, checked_station_order),
         );
 
-        print_item("改札実施時間", format_time(be16(block, 14)));
+        print_item("Gate time", format_time(be16(block, 14)));
 
         println!();
     }

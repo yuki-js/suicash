@@ -1,5 +1,5 @@
-# SuiCash アセットの生成物。SVG が正本、PNG は generate-png.mjs で作る。
+# Generated SuiCash assets. SVGs are the source of truth; PNGs come from generate-png.mjs.
 **/*.png
 
-# generate-png.mjs 用
+# For generate-png.mjs
 node_modules/

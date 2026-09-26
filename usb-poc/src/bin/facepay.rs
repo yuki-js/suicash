@@ -1,42 +1,43 @@
-//! SuiCash 決済端末の母艦デーモン。
+//! SuiCash payment terminal host daemon.
 //!
-//! usb-poc の card(FeliCa 読取)+ oracle(challenge/settle/attest)を土台に、
-//! 端末(Hi-CARA の WebView)と WebSocket で連携し、IDi 導出ウォレットの
-//! オンチェーン決済(sui-pay.mjs 経由)を行う。
+//! Built on usb-poc card (FeliCa reads) + oracle (challenge/settle/attest),
+//! it talks to the terminal (Hi-CARA WebView) over WebSocket and performs
+//! on-chain payments from the IDi-derived wallet (via sui-pay.mjs).
 //!
-//!   [Suica] ⇄ RC-S634 ⇄ facepay ⇄ oracle(IDi 認証)
+//!   [Suica] ⇄ RC-S634 ⇄ facepay ⇄ oracle (IDi auth)
 //!                          │
-//!                          ├─ sui-pay.mjs: IDi導出ウォレットの残高照会・送金
-//!                          └─ WebSocket(:8899) ⇄ Hi-CARA WebView(顔認証・改札LCD)
+//!                          ├─ sui-pay.mjs: IDi-derived wallet balance / transfer
+//!                          └─ WebSocket(:8899) ⇄ Hi-CARA WebView (face auth, gate LCD)
 //!
-//! 端末は adb reverse tcp:8899 経由で ws://localhost:8899 に接続する。
-//! 母艦→端末: card / mode / paymentResult / cardRemoved
-//! 端末→母艦: faceOk / faceNg / enrolled / cancel
+//! The terminal connects to ws://localhost:8899 via adb reverse tcp:8899.
+//! host → terminal: card / mode / paymentResult / cardRemoved
+//! terminal → host: faceOk / faceNg / enrolled / cancel
 //!
-//! 起動すると全機能(FeliCa読取・オラクル認証・WS配信・決済)が有効化され、
-//! さらに adb 経由で Hi-CARA 端末クライアント(WebView)を自動起動する。
-//! GUI 版(facepay-admin)はこのデーモンを子プロセスとして起動する。
+//! On startup every feature (FeliCa reads, oracle auth, WS broadcast, payments)
+//! is enabled, and the Hi-CARA terminal client (WebView) is auto-launched via adb.
+//! The GUI version (facepay-admin) starts this daemon as a child process.
 //!
-//! 環境変数:
-//!   FACEPAY_ORACLE    オラクル URL(既定 https://felica-oracle.serken.tech)
-//!   FACEPAY_WS_PORT   WebSocket ポート(既定 8899)
-//!   FACEPAY_MERCHANT  店舗アドレス(決済の送金先。未設定だと決済不可)
-//!   FACEPAY_SUI_HELPER sui-pay.mjs のパス(既定は自動解決)
-//!   SUI_RPC           fullnode RPC(sui-pay.mjs へ引継)
+//! Environment variables:
+//!   FACEPAY_ORACLE    oracle URL (default https://felica-oracle.serken.tech)
+//!   FACEPAY_WS_PORT   WebSocket port (default 8899)
+//!   FACEPAY_MERCHANT  merchant address (payment recipient; payments disabled if unset)
+//!   FACEPAY_SUI_HELPER path to sui-pay.mjs (resolved automatically by default)
+//!   SUI_RPC           fullnode RPC (passed through to sui-pay.mjs)
 //!   SUICASH_GATE_PKG / SUICASH_GATE_OBJ
-//!                     オンチェーン ZK ゲート(felica_oracle パッケージと共有
-//!                     Gate オブジェクト)。sui-pay.mjs へ引継。未設定なら
-//!                     sui-pay.mjs 隣の gate.json が使われる
+//!                     on-chain ZK gate (felica_oracle package and shared
+//!                     Gate object). Passed through to sui-pay.mjs. If unset,
+//!                     gate.json next to sui-pay.mjs is used
 //!
-//! 決済フロー: カードタップ時にオラクルが Groth16 証明を発行し、決済 PTB の
-//! 先頭で suicash_gate::verify がそれをオンチェーン検証する。検証に失敗すると
-//! 送金ごとアボートする(証明なしの決済経路はない)。証明は r1 に束縛され
-//! オンチェーンで burn されるため一度きり。次の決済は再タッチが必要。
-//!   FACEPAY_AUTOLAUNCH  端末オートローンチ(既定 1。0 で無効)
-//!   FACEPAY_UI_PORT     端末が読む UI 配信ポート(既定 5173)
-//!   FACEPAY_TERMINAL_URL   端末に開かせる URL(既定は UI_PORT/WS_PORT から生成)
-//!   FACEPAY_TERMINAL_COMPONENT  端末アプリの起動コンポーネント
-//!   ADB               adb バイナリのパス(既定 adb)
+//! Payment flow: on card tap the oracle issues a Groth16 proof, and
+//! suicash_gate::verify checks it on-chain at the start of the payment PTB. If
+//! verification fails the whole transfer aborts (there is no payment path without
+//! a proof). The proof is bound to r1 and burned on-chain, so it is single-use;
+//! the next payment requires a re-tap.
+//!   FACEPAY_AUTOLAUNCH  terminal auto-launch (default 1; 0 disables)
+//!   FACEPAY_UI_PORT     UI server port the terminal loads (default 5173)
+//!   FACEPAY_TERMINAL_URL   URL the terminal opens (default built from UI_PORT/WS_PORT)
+//!   FACEPAY_TERMINAL_COMPONENT  launch component of the terminal app
+//!   ADB               path to the adb binary (default adb)
 
 use std::io::BufRead;
 use std::process::Command;
@@ -67,21 +68,21 @@ struct Config {
 
 #[derive(Default)]
 struct Shared {
-    /// 決済待機額(MIST)。None = 残高照会モード
+    /// Pending payment amount (MIST). None = balance inquiry mode
     pay_mode: Option<u64>,
-    /// いま端末に出しているカードの IDi
+    /// IDi of the card currently shown on the terminal
     current_idi: Option<String>,
-    /// いま端末に出しているカードの attestation JSON(sui-pay.mjs へ渡す)。
-    /// オンチェーンの gate が r1 を burn するため一度きり: 決済開始時に
-    /// take され、次の決済にはカードの再タッチ(再 attest)が必要。
+    /// Attestation JSON of the card currently shown on the terminal (passed to sui-pay.mjs).
+    /// Single-use because the on-chain gate burns r1: it is taken when a payment
+    /// starts, and the next payment requires a card re-tap (re-attest).
     current_att: Option<String>,
-    /// 接続中の全クライアント(端末 + 管理GUI)への送信口。全員に配信する。
+    /// Senders to every connected client (terminal + admin GUI). Broadcast to all.
     clients: Vec<(u64, Sender<String>)>,
     next_client_id: u64,
-    /// 直近の card イベント JSON。接続時に再送し、カードが載ったまま
-    /// 端末が起動/リロードしても反応するようにする。
+    /// Latest card event JSON. Resent on connect so the terminal still reacts
+    /// if it starts/reloads while a card is already on the reader.
     last_card_json: Option<String>,
-    /// 直近の決済結果 JSON(管理GUI 表示用)
+    /// Latest payment result JSON (for the admin GUI)
     last_payment_json: Option<String>,
 }
 type State = Arc<Mutex<Shared>>;
@@ -90,8 +91,8 @@ fn env(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
 
-/// sui-pay.mjs の場所を cwd に依存せず解決する。
-/// 環境変数優先。なければ cwd / リポジトリ配置 / 実行ファイル相対で探す。
+/// Resolves the location of sui-pay.mjs independently of cwd.
+/// Env var wins; otherwise search cwd / repo layout / relative to the executable.
 fn resolve_helper() -> String {
     if let Ok(p) = std::env::var("FACEPAY_SUI_HELPER") {
         return p;
@@ -100,7 +101,7 @@ fn resolve_helper() -> String {
         "facepay/sui-pay.mjs".into(),
         "usb-poc/facepay/sui-pay.mjs".into(),
     ];
-    // 実行ファイル(usb-poc/target/debug/facepay)から見た ../../facepay/sui-pay.mjs
+    // ../../facepay/sui-pay.mjs as seen from the executable (usb-poc/target/debug/facepay)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             candidates.push(dir.join("../../facepay/sui-pay.mjs"));
@@ -128,7 +129,7 @@ fn main() {
         "facepay: oracle={} ws=:{} merchant={} helper={}",
         cfg.oracle,
         cfg.ws_port,
-        if cfg.merchant.is_empty() { "(未設定: 決済不可)" } else { &cfg.merchant },
+        if cfg.merchant.is_empty() { "(unset: payments disabled)" } else { &cfg.merchant },
         cfg.sui_helper,
     );
 
@@ -136,7 +137,7 @@ fn main() {
         let (state, cfg) = (state.clone(), cfg.clone());
         thread::spawn(move || ws_server(state, cfg));
     }
-    // 端末オートローンチ(adb reverse + am start)。WS 待受が立ってから。
+    // Terminal auto-launch (adb reverse + am start), once the WS listener is up.
     if env("FACEPAY_AUTOLAUNCH", "1") != "0" {
         let cfg = cfg.clone();
         thread::spawn(move || {
@@ -151,9 +152,9 @@ fn main() {
     card_loop(state, cfg);
 }
 
-// ----------------------------------------------------------------- 端末へ送信
+// ----------------------------------------------------------------- send to terminal
 
-/// 接続中の全クライアント(端末・管理GUI)へ配信
+/// Broadcast to every connected client (terminal, admin GUI)
 fn send_terminal(state: &State, json: String) {
     let txs: Vec<Sender<String>> = {
         let s = state.lock().unwrap();
@@ -171,7 +172,7 @@ fn mode_json(pay_mode: Option<u64>) -> String {
     }
 }
 
-/// 管理GUI 向けの状態イベント
+/// Status event for the admin GUI
 fn status_json(s: &Shared) -> String {
     let mode = match s.pay_mode {
         Some(a) => format!(r#""payment","amount":"{a}""#),
@@ -193,23 +194,23 @@ fn broadcast_status(state: &State) {
     send_terminal(state, json);
 }
 
-// ------------------------------------------------------------- WebSocket サーバ
+// ------------------------------------------------------------- WebSocket server
 
 fn ws_server(state: State, cfg: Arc<Config>) {
     let addr = format!("127.0.0.1:{}", cfg.ws_port);
     let listener = match std::net::TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("WS bind 失敗 {addr}: {e}");
+            eprintln!("WS bind failed {addr}: {e}");
             return;
         }
     };
-    eprintln!("WS 待受 {addr}(端末は adb reverse tcp:{} で接続)", cfg.ws_port);
+    eprintln!("WS listening on {addr} (terminal connects via adb reverse tcp:{})", cfg.ws_port);
     for stream in listener.incoming().flatten() {
         let (state, cfg) = (state.clone(), cfg.clone());
         thread::spawn(move || {
             if let Err(e) = ws_handle(stream, state, cfg) {
-                eprintln!("WS 接続終了: {e}");
+                eprintln!("WS connection closed: {e}");
             }
         });
     }
@@ -222,7 +223,7 @@ fn ws_handle(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut ws = tungstenite::accept(stream)?;
     ws.get_ref().set_read_timeout(Some(Duration::from_millis(100)))?;
-    eprintln!("クライアント接続");
+    eprintln!("client connected");
 
     let (tx, rx) = channel::<String>();
     let id;
@@ -238,7 +239,7 @@ fn ws_handle(
         drop(s);
         let _ = ws.send(tungstenite::Message::Text(mode));
         let _ = ws.send(tungstenite::Message::Text(status));
-        // カードが既に載っているなら接続直後に再通知
+        // If a card is already present, re-notify right after connecting
         if let Some(card) = card {
             let _ = ws.send(tungstenite::Message::Text(card));
         }
@@ -246,7 +247,7 @@ fn ws_handle(
             let _ = ws.send(tungstenite::Message::Text(payment));
         }
     }
-    // 接続数が変わったので他クライアントにも status を配信
+    // Connection count changed, so broadcast status to the other clients too
     broadcast_status(&state);
 
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
@@ -267,7 +268,7 @@ fn ws_handle(
         Ok(())
     })();
 
-    // 切断: このクライアントを外す
+    // Disconnected: remove this client
     {
         let mut s = state.lock().unwrap();
         s.clients.retain(|(cid, _)| *cid != id);
@@ -276,18 +277,18 @@ fn ws_handle(
     result
 }
 
-/// 端末からのレポート処理(faceOk で決済モードなら送金)
+/// Handles reports from the terminal (faceOk in payment mode triggers a transfer)
 fn handle_report(text: &str, state: &State, cfg: &Arc<Config>) {
     let v: serde_json::Value = match serde_json::from_str(text) {
         Ok(v) => v,
         Err(_) => return,
     };
     let t = v.get("type").and_then(|x| x.as_str()).unwrap_or("");
-    eprintln!("端末→母艦: {t}");
+    eprintln!("terminal → host: {t}");
     match t {
         "faceOk" => {
-            // attestation は take で取り出す(オンチェーンで r1 が burn される
-            // ため一度きり)。決済に入らないときは残しておく。
+            // Take the attestation out (single-use, since r1 is burned on-chain).
+            // Leave it in place when not entering a payment.
             let job = {
                 let mut s = state.lock().unwrap();
                 match (s.pay_mode, s.current_idi.clone()) {
@@ -300,12 +301,12 @@ fn handle_report(text: &str, state: &State, cfg: &Arc<Config>) {
                 thread::spawn(move || run_payment(&state, &cfg, &idi, amount, att));
             }
         }
-        // 管理GUI からの操作コマンド {"type":"op","cmd":"pay"|"idle"|"status","amount":<MIST>}
+        // Operator commands from the admin GUI {"type":"op","cmd":"pay"|"idle"|"status","amount":<MIST>}
         "op" => {
             let cmd = v.get("cmd").and_then(|x| x.as_str()).unwrap_or("");
             match cmd {
                 "pay" => {
-                    // amount は MIST(数値) か SUI(文字列 sui) を許容
+                    // amount accepts MIST (number) or SUI (the "sui" field)
                     let mist = v
                         .get("amount")
                         .and_then(|x| x.as_u64())
@@ -323,30 +324,30 @@ fn handle_report(text: &str, state: &State, cfg: &Arc<Config>) {
     }
 }
 
-/// 決済待機額を設定して端末・GUI に mode と status を配信
+/// Sets the pending payment amount and broadcasts mode and status to terminal/GUI
 fn set_pay_mode(state: &State, mist: Option<u64>) {
     state.lock().unwrap().pay_mode = mist;
     send_terminal(state, mode_json(mist));
     broadcast_status(state);
 }
 
-/// 決済(送金)を実行し paymentResult を端末へ返す。
+/// Executes the payment (transfer) and returns paymentResult to the terminal.
 ///
-/// 送金 PTB の先頭で attestation の Groth16 証明をオンチェーン検証する
-/// (felica_oracle::suicash_gate::verify)。証明が通らなければ送金ごと
-/// アボートするので、ZK 検証を通らない決済経路は存在しない。
+/// The attestation's Groth16 proof is verified on-chain at the start of the
+/// transfer PTB (felica_oracle::suicash_gate::verify). If the proof fails the
+/// whole transfer aborts, so no payment path bypasses ZK verification.
 fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64, att: Option<String>) {
     if cfg.merchant.is_empty() {
-        emit_payment(state, r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"店舗アドレス未設定"}"#.to_string());
+        emit_payment(state, r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"Merchant address not set"}"#.to_string());
         return;
     }
     let Some(att) = att else {
         emit_payment(state, format!(
-            r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"0","error":"認証情報がありません。カードを再タッチしてください"}}"#
+            r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"0","error":"No attestation. Please tap your card again"}}"#
         ));
         return;
     };
-    // 送金前に残高を確認。足りなければ日本語で「残高がありません」
+    // Check the balance before transferring; if short, report "Insufficient balance"
     let bal = sui_helper(cfg, &["balance", idi]);
     let balance: u128 = bal
         .get("balance")
@@ -357,7 +358,7 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64, att: Op
         emit_payment(
             state,
             format!(
-                r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"{balance}","error":"残高がありません"}}"#
+                r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"{balance}","error":"Insufficient balance"}}"#
             ),
         );
         return;
@@ -374,15 +375,15 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64, att: Op
         let digest = res.get("digest").and_then(|x| x.as_str()).unwrap_or("");
         format!(r#"{{"type":"paymentResult","ok":true,"amount":"{amount}","balanceAfter":"{after}","digest":"{digest}"}}"#)
     } else {
-        // 送金失敗はすべて日本語に。ガス/残高不足は「残高がありません」
+        // Map every transfer failure to a user-facing message; gas/balance shortfall -> "Insufficient balance"
         let raw = res.get("error").and_then(|x| x.as_str()).unwrap_or("");
         let jp = if raw.to_lowercase().contains("insufficient")
             || raw.to_lowercase().contains("gas")
             || raw.to_lowercase().contains("balance")
         {
-            "残高がありません"
+            "Insufficient balance"
         } else {
-            "決済に失敗しました"
+            "Payment failed"
         };
         format!(
             r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"{balance}","error":"{jp}"}}"#
@@ -391,20 +392,20 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64, att: Op
     emit_payment(state, msg);
 }
 
-/// 決済結果を配信し、管理GUI 再表示用に保持する
+/// Broadcasts the payment result and keeps it for redisplay in the admin GUI
 fn emit_payment(state: &State, json: String) {
     state.lock().unwrap().last_payment_json = Some(json.clone());
     send_terminal(state, json);
 }
 
-// ------------------------------------------------------------- sui-pay.mjs 呼出
+// ------------------------------------------------------------- sui-pay.mjs calls
 
 fn sui_helper(cfg: &Config, args: &[&str]) -> serde_json::Value {
     sui_helper_env(cfg, args, &[])
 }
 
-/// 追加の環境変数つきで sui-pay.mjs を呼ぶ。attestation は引数だと ps に
-/// 露出し長さ制限も踏むので、環境変数で渡す。
+/// Calls sui-pay.mjs with extra environment variables. The attestation is passed
+/// via env because as an argument it would be exposed in ps and hit length limits.
 fn sui_helper_env(cfg: &Config, args: &[&str], envs: &[(&str, &str)]) -> serde_json::Value {
     let mut cmd = Command::new("node");
     cmd.arg(&cfg.sui_helper).args(args);
@@ -417,14 +418,14 @@ fn sui_helper_env(cfg: &Config, args: &[&str], envs: &[(&str, &str)]) -> serde_j
             serde_json::from_str(s.trim().lines().last().unwrap_or("{}"))
                 .unwrap_or_else(|_| serde_json::json!({"ok":false,"error":"helper parse error"}))
         }
-        Err(e) => serde_json::json!({"ok": false, "error": format!("node 実行失敗: {e}")}),
+        Err(e) => serde_json::json!({"ok": false, "error": format!("failed to run node: {e}")}),
     }
 }
 
-// ----------------------------------------------------- 端末(Hi-CARA)オートローンチ
+// ----------------------------------------------------- terminal (Hi-CARA) auto-launch
 
-/// adb 経由で端末クライアントを自動起動する(ベストエフォート)。
-/// 失敗しても警告だけ出してデーモン本体は継続する。
+/// Auto-launches the terminal client via adb (best effort).
+/// On failure it only warns; the daemon itself keeps running.
 fn launch_terminal(cfg: &Config) {
     let adb = env("ADB", "adb");
     let ui_port: u16 = env("FACEPAY_UI_PORT", "5173").parse().unwrap_or(5173);
@@ -432,26 +433,26 @@ fn launch_terminal(cfg: &Config) {
         "FACEPAY_TERMINAL_COMPONENT",
         "jp.serkenn.hicara.suicashui/.MainActivity",
     );
-    // 端末の localhost:{ws_port} を母艦へ橋渡し(WS)。UI 配信も同様に橋渡し。
+    // Bridge the terminal's localhost:{ws_port} to the host (WS); same for the UI server.
     let ws_arg = format!("tcp:{}", cfg.ws_port);
     let ui_arg = format!("tcp:{ui_port}");
-    // 端末が開く URL。?ws= は URL エンコードして渡す(terminal.ts が復号する)。
+    // URL the terminal opens. ?ws= is URL-encoded (terminal.ts decodes it).
     let default_url = format!(
         "http://localhost:{ui_port}/?ws=ws%3A%2F%2Flocalhost%3A{}",
         cfg.ws_port
     );
     let url = env("FACEPAY_TERMINAL_URL", &default_url);
 
-    // 端末が接続されているか確認
+    // Check that a terminal is connected
     let devices = Command::new(&adb).arg("devices").output();
     match &devices {
         Ok(o) if String::from_utf8_lossy(&o.stdout).lines().skip(1).any(|l| l.contains("device")) => {}
         Ok(_) => {
-            eprintln!("端末オートローンチ: adb デバイス未検出(手動接続時は adb 後に再起動)");
+            eprintln!("terminal auto-launch: no adb device found (if connecting manually, restart after adb)");
             return;
         }
         Err(e) => {
-            eprintln!("端末オートローンチ: adb 実行不可({e}) — スキップ");
+            eprintln!("terminal auto-launch: cannot run adb ({e}) — skipping");
             return;
         }
     }
@@ -466,15 +467,15 @@ fn launch_terminal(cfg: &Config) {
     ];
     for (label, args) in steps {
         match Command::new(&adb).args(&args).output() {
-            Ok(o) if o.status.success() => eprintln!("端末オートローンチ: {label} OK"),
+            Ok(o) if o.status.success() => eprintln!("terminal auto-launch: {label} OK"),
             Ok(o) => eprintln!(
-                "端末オートローンチ: {label} 失敗 {}",
+                "terminal auto-launch: {label} failed {}",
                 String::from_utf8_lossy(&o.stderr).trim()
             ),
-            Err(e) => eprintln!("端末オートローンチ: {label} 実行不可({e})"),
+            Err(e) => eprintln!("terminal auto-launch: {label} cannot run ({e})"),
         }
     }
-    eprintln!("端末オートローンチ: 完了({url})");
+    eprintln!("terminal auto-launch: done ({url})");
 }
 
 // ------------------------------------------------------------------- CLI
@@ -488,50 +489,50 @@ fn cli_loop(state: State, cfg: Arc<Config>) {
                 if let Some(sui) = it.next().and_then(|x| x.parse::<f64>().ok()) {
                     let mist = (sui * 1e9).round() as u64;
                     set_pay_mode(&state, Some(mist));
-                    println!("→ 決済待機 {sui} SUI ({mist} MIST)");
+                    println!("→ awaiting payment {sui} SUI ({mist} MIST)");
                 } else {
-                    println!("使い方: pay <SUI>  例) pay 0.3");
+                    println!("usage: pay <SUI>  e.g. pay 0.3");
                 }
             }
             Some("idle") => {
                 set_pay_mode(&state, None);
-                println!("→ 残高照会モード");
+                println!("→ balance inquiry mode");
             }
             Some("status") => {
                 let s = state.lock().unwrap();
                 println!(
                     "mode={} card={} clients={} (helper={})",
                     match s.pay_mode {
-                        Some(m) => format!("決済 {m} MIST"),
-                        None => "残高照会".into(),
+                        Some(m) => format!("payment {m} MIST"),
+                        None => "balance".into(),
                     },
-                    s.current_idi.clone().unwrap_or_else(|| "(なし)".into()),
+                    s.current_idi.clone().unwrap_or_else(|| "(none)".into()),
                     s.clients.len(),
                     cfg.sui_helper,
                 );
             }
             Some("quit") | Some("exit") => std::process::exit(0),
-            Some(other) => println!("不明なコマンド: {other}"),
+            Some(other) => println!("unknown command: {other}"),
             None => {}
         }
     }
 }
 
-// ------------------------------------------------------------- FeliCa 読取ループ
+// ------------------------------------------------------------- FeliCa read loop
 
 fn card_loop(state: State, cfg: Arc<Config>) {
     let oracle = match Oracle::new(cfg.oracle.clone()) {
         Ok(o) => o,
         Err(e) => {
-            eprintln!("オラクル初期化失敗: {e:#}");
+            eprintln!("oracle init failed: {e:#}");
             return;
         }
     };
     match oracle.ping() {
-        Ok(p) => eprintln!("オラクル ping: {p:?}"),
-        Err(e) => eprintln!("オラクル ping 失敗(続行): {e:#}"),
+        Ok(p) => eprintln!("oracle ping: {p:?}"),
+        Err(e) => eprintln!("oracle ping failed (continuing): {e:#}"),
     }
-    eprintln!("カード待ち…(RC-S634)");
+    eprintln!("waiting for card… (RC-S634)");
 
     let mut last_idm = String::new();
     loop {
@@ -541,11 +542,11 @@ fn card_loop(state: State, cfg: Arc<Config>) {
             Ok(mut card) => {
                 let idm = hex::encode(card.idm);
                 if idm == last_idm {
-                    // 同じカードが載りっぱなし。再オープン頻度を下げる
+                    // Same card still on the reader; reopen less often
                     thread::sleep(Duration::from_millis(800));
                     continue;
                 }
-                // タップを検出した瞬間に「認証中」を即通知(オラクル認証は数秒かかる)
+                // Notify "authenticating" the moment a tap is detected (oracle auth takes seconds)
                 send_terminal(&state, r#"{"type":"detecting"}"#.to_string());
                 match attest_with_card(&mut card, &oracle) {
                     Ok((idi, att_json)) => {
@@ -553,17 +554,17 @@ fn card_loop(state: State, cfg: Arc<Config>) {
                         on_card(&state, &cfg, &idi, att_json);
                     }
                     Err(e) => {
-                        eprintln!("認証失敗: {e:#}");
+                        eprintln!("auth failed: {e:#}");
                         thread::sleep(Duration::from_millis(500));
                     }
                 }
             }
             Err(_) => {
-                // Err の種類を経過時間で区別する:
-                //  - 速い失敗(< 700ms): 再オープンの一過性失敗(チラつき)→ 離脱としない
-                //  - 遅い失敗(ポーリング満了): リーダーは開けたがカード無し → 離脱
-                // これで「載っていない=即離脱」「同じカードのリフト→再タッチ」を
-                // 速く確実に扱える(同じカードを連続で読める)。
+                // Distinguish the kind of Err by elapsed time:
+                //  - fast failure (< 700ms): transient reopen failure (flicker) -> not a removal
+                //  - slow failure (polling timed out): reader opened but no card -> removal
+                // This handles "not present = removed immediately" and "lift and re-tap the
+                // same card" quickly and reliably (the same card can be read repeatedly).
                 let slow = t0.elapsed() >= Duration::from_millis(700);
                 if slow && !last_idm.is_empty() {
                     last_idm.clear();
@@ -581,8 +582,8 @@ fn card_loop(state: State, cfg: Arc<Config>) {
     }
 }
 
-/// ポーリング済みカードに対し challenge→Auth1→settle→Auth2→attest を行い、
-/// IDi と、オンチェーン ZK 検証に必要な attestation JSON を得る
+/// Runs challenge→Auth1→settle→Auth2→attest on a polled card to obtain the IDi
+/// and the attestation JSON needed for on-chain ZK verification
 fn attest_with_card(card: &mut Card, oracle: &Oracle) -> anyhow::Result<(String, String)> {
     let idm = card.idm;
     let mut r1: Block = [0u8; 8];
@@ -606,12 +607,13 @@ fn attest_with_card(card: &mut Card, oracle: &Oracle) -> anyhow::Result<(String,
     Ok((attest.idi.to_lowercase(), att_json))
 }
 
-/// オラクルの座標形式 Groth16 証明を `sui::groth16` が受ける Arkworks 圧縮
-/// バイト列へ変換し、sui-pay.mjs へ渡す attestation JSON を組み立てる。
+/// Converts the oracle's coordinate-form Groth16 proof into the Arkworks
+/// compressed bytes accepted by `sui::groth16`, and builds the attestation JSON
+/// passed to sui-pay.mjs.
 ///
-/// r1 はこのプロセスの CSPRNG が選んだ値で、証明はそれに束縛されている。
-/// オンチェーンの gate が同じ r1 を要求して burn するので、この JSON は
-/// 一度しか使えない。
+/// r1 is chosen by this process's CSPRNG and the proof is bound to it. The
+/// on-chain gate requires the same r1 and burns it, so this JSON can only be
+/// used once.
 fn attestation_json(att: &usb_poc::oracle::AttestResult, r1: &Block) -> anyhow::Result<String> {
     let wire = prover::Groth16Proof {
         alg: att.proof.alg.clone(),
@@ -621,9 +623,9 @@ fn attestation_json(att: &usb_poc::oracle::AttestResult, r1: &Block) -> anyhow::
         public_inputs: att.proof.public_inputs.clone(),
     };
     let proof = prover::proof_compressed_bytes(&wire)
-        .map_err(|e| anyhow::anyhow!("proof の圧縮変換に失敗: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("failed to convert proof to compressed form: {e}"))?;
     let pis = prover::public_inputs_bytes(&wire)
-        .map_err(|e| anyhow::anyhow!("public inputs の変換に失敗: {e}"))?;
+        .map_err(|e| anyhow::anyhow!("failed to convert public inputs: {e}"))?;
     Ok(serde_json::json!({
         "idi": att.idi.to_lowercase(),
         "attested_at": att.attested_at,
@@ -634,12 +636,12 @@ fn attestation_json(att: &usb_poc::oracle::AttestResult, r1: &Block) -> anyhow::
     .to_string())
 }
 
-/// カード確定時: 残高照会・登録判定して card イベントを端末へ
+/// On card confirmation: look up balance / registration and send a card event to the terminal
 fn on_card(state: &State, cfg: &Arc<Config>, idi: &str, att_json: String) {
-    eprintln!("カード: IDi={idi}(ZK attestation 取得済み)");
+    eprintln!("card: IDi={idi} (ZK attestation obtained)");
     let bal = sui_helper(cfg, &["balance", idi]);
     let balance = bal.get("balance").and_then(|x| x.as_str()).unwrap_or("0").to_string();
-    // オンチェーン登録の判定は残高 > 0(regist-web でチャージ済み=登録済み)を代用
+    // On-chain registration is approximated by balance > 0 (charged via regist-web = registered)
     let registered = balance.parse::<u128>().map(|n| n > 0).unwrap_or(false);
     let json = format!(r#"{{"type":"card","idi":"{idi}","registered":{registered},"balance":"{balance}"}}"#);
     {

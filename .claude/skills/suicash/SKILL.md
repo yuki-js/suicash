@@ -1,40 +1,40 @@
 ---
 name: suicash
-description: SuiCash(スイカッシュ)プロダクトの概要・提供機能・デモンストレーションの目的・ロゴとマスコットのガイドラインを参照するときに使う。SuiCash に関する開発・デザイン・ドキュメント作成の前提知識。
+description: Use when referring to the SuiCash product overview, features, demonstration goals, and logo/mascot guidelines. Background knowledge for development, design, and documentation work on SuiCash.
 ---
 
-# 提供する機能
+# Features
 
-- 顔とIDiを紐づけてSuiにアップロード(フロントエンド)
-- IDiをシードにAccount Abstractionウォレットを作成
-- IDiに対してチャージ(上記ウォレットをルータで解決して送金という感じ)
-- IDiと顔のZKP証明でウォレットをアンロック
+- Link a face to an IDi and upload it to Sui (frontend)
+- Create an Account Abstraction wallet seeded from the IDi
+- Top up an IDi (roughly: resolve the wallet above via a router and send funds to it)
+- Unlock the wallet with a ZKP proof of the IDi and face
 
-# やりたいこと
-FeliCaのカードを、Suiブロックチェーン上で検証したいです。
-FeliCaは本来、公開鍵暗号の塊であるブロックチェーンとは別の技術で、共通鍵暗号ベースの技術という性質であり、それとSuiをマージしたいと考えています。
+# Goals
+We want to verify FeliCa cards on the Sui blockchain.
+FeliCa is inherently a different technology from blockchains, which are built on public-key cryptography: it is based on symmetric-key cryptography. We want to merge it with Sui.
 
-FeliCaのカードを持っていることを確認して、それを根拠にしたしっかりとしたデモンストレーションを、ユースケースと一緒に行いたいです。
+We want to confirm possession of a FeliCa card and build a solid demonstration grounded in that, together with a use case.
 
-FeliCaの検証でウォレットを操作できるようにすることで、体験として提供したいと考えています。そうすることで、FeliCaは日本で普及している技術ではあるものの、暗号資産は日本では普及していませんし、普及していたとしても、ミームコインとしてくらいにしか広がっていない状況があります。その中で、日本で広く普及しているFeliCaと暗号資産を融合することで、より一層暗号資産のマサダプションを日本で行うことを目指しています。
+We want to offer this as an experience by letting FeliCa verification operate a wallet. FeliCa is widespread in Japan, but crypto assets are not, and where they are, they have mostly spread only as meme coins. By fusing FeliCa, which is widely used in Japan, with crypto assets, we aim to push crypto mass adoption further in Japan.
 
-そのためのデモンストレーション用プロダクトです。
+This is a product for demonstrating that.
 
-今回、FeliCaの脆弱性が発見され、詳細が発表されました。その脆弱性は簡単には修正できるものではなかったため、その他の対策と合わせて実装されることになります。
+A vulnerability in FeliCa was recently discovered and its details published. Since it cannot be fixed easily, it will be addressed alongside other countermeasures.
 
-# ロゴマーク
+# Logo
 
-プロダクト名: SuiCash（スイカッシュ）
+Product name: SuiCash (read "Suicash", like "Suica" + "cash")
 
-由来と背景:
-この名前は、JR東日本の電子マネー「Suica」を少しもじったものです。
-Suiブロックチェーンを使っているため、Suiとキャッシュの意味を合わせて「SuiCash」を名付けています。
+Origin and background:
+The name is a play on "Suica", JR East's electronic money.
+Since the product uses the Sui blockchain, it combines "Sui" and "cash" into "SuiCash".
 
-- SuiCashの文字は、ゴシック体で表現する。
-- 出来れば、オリジナルのSuicaの文字に近い雰囲気（例: ブラック体のHelveticaや、Segoe UIなど）を検討する。
-- SuiCashの文字のうち、SuicaのIC部分のように、ICの部分だけをアウトラインの文字として表現する。
+- Set the SuiCash lettering in a sans-serif (gothic) typeface.
+- If possible, aim for a feel close to the original Suica lettering (e.g. Helvetica Black, Segoe UI).
+- Within the SuiCash lettering, render only the "IC" part as outlined letters, like the IC part of Suica.
 
-## マスコットキャラクター
-B案とペンギンのキメラ。
-- B案の気持ち悪さを継承しつつ、色は紫にしない。
-- 形状は一致させない。
+## Mascot
+A chimera of design B and a penguin.
+- Keep design B's creepiness, but don't make it purple.
+- Don't match its shape.

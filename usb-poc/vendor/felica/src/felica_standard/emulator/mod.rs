@@ -93,8 +93,8 @@ impl FelicaStandardEmulator {
     /// Models the card leaving the reader's field: every system returns to Mode0
     /// and any authentication in progress is discarded.
     ///
-    /// §4.3: "電源供給が絶たれた場合は、モードは維持されず、再電源供給時に Mode0 と
-    /// なります". A host driving this emulator should call it whenever the RF field
+    /// §4.3: "if the power supply is cut, the mode is not retained, and it
+    /// becomes Mode0 when power is restored". A host driving this emulator should call it whenever the RF field
     /// drops, because a system left in Mode1 or above stops answering Polling
     /// commands addressed to it and would otherwise never become reachable again.
     pub fn power_off(&mut self) -> &mut Self {
@@ -357,7 +357,7 @@ impl FelicaStandardEmulator {
         let mut blocks = Vec::with_capacity(block_list.len());
         for (index, block) in block_list.iter().enumerate() {
             // §4.4.5: Read Without Encryption reaches only services whose
-            // attribute is "認証不要".
+            // attribute is "authentication not required".
             let (service_code, block_number) =
                 match system.validate_read_block(service_codes, index, block, true) {
                     Ok(value) => value,
@@ -454,9 +454,9 @@ impl FelicaStandardEmulator {
         let resolved = self.systems[index].system_code;
 
         if self.active_system == Some(resolved) {
-            // "Mode0 以外へ遷移すると、Polling コマンドを受け付けなくなります。これは、
-            // IDm をすでに取得したカードが Polling コマンドに返答しないことで、カードか
-            // らの返答の衝突を軽減させるためです" (§4.3). Table 4-1 accordingly lists
+            // "after transitioning to a mode other than Mode0, the Polling command is no
+            // longer accepted. This reduces response collisions, since a card whose IDm
+            // has already been obtained does not answer Polling" (§4.3). Table 4-1 accordingly lists
             // Polling addressed to the current system for Mode0 alone, and a
             // rejected Polling leaves the mode untouched.
             if !self.systems[index].mode_permits(ModeRequirement::Unauthenticated) {
@@ -475,10 +475,10 @@ impl FelicaStandardEmulator {
 
     /// Finds the system whose system code matches, comparing from system 0 upward.
     ///
-    /// §4.4.2: "カードのシステムが分割されていた場合は、まずシステム 0 に対してシステム
-    /// コードの比較が行われ、順次、システム 1 以降のシステムに対して比較が行われます。
-    /// したがって、システムコードの両バイトにワイルドカードを指定（FFFFh）した場合は常に
-    /// システム 0 が応答します". The order is fixed by the card layout, so the system
+    /// §4.4.2: "if the card's system is partitioned, the system code is compared against
+    /// system 0 first, then against system 1 onward in order. Therefore, if a
+    /// wildcard (FFFFh) is given for both bytes of the system code, system 0
+    /// always responds". The order is fixed by the card layout, so the system
     /// currently being talked to gets no precedence.
     fn polling_target_index(&self, request_system_code: u16) -> Option<usize> {
         self.systems
@@ -1034,7 +1034,7 @@ mod tests {
             assert_eq!(frame[13], expected, "generation {block}");
         }
 
-        // "書き込み時は、常にブロック番号に 0 を指定する必要があります".
+        // "when writing, block number 0 must always be specified".
         assert_eq!(
             write(
                 &mut emulator,

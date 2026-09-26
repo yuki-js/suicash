@@ -1,7 +1,7 @@
 /**
- * SuiCash ワードマーク。assets/logo/suicash-logo.svg と同じ組み方
- * (REM 605、iC のみアウトライン)を HTML インラインで再現する。
- * 外部 SVG を <img> で読むと Web フォントが遮断されるため、ここで直接組む。
+ * SuiCash wordmark. Reproduces the setting of assets/logo/suicash-logo.svg
+ * (REM 605, only iC outlined) inline in HTML.
+ * Loading external SVG via <img> blocks web fonts, so it is built directly here.
  */
 export function Logo({ inverted = false }: { inverted?: boolean }) {
   const cls = inverted ? "logo logo--inverted" : "logo";

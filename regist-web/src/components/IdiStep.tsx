@@ -7,16 +7,16 @@ interface Props {
   onDone: (r: Pick<Registration, "cardNumber" | "idi">) => void;
 }
 
-/** カメラ OCR が使えるか(secure context + getUserMedia) */
+/** Whether camera OCR is available (secure context + getUserMedia) */
 function cameraAvailable(): boolean {
   return !!(window.isSecureContext && navigator.mediaDevices?.getUserMedia);
 }
 
 /**
- * カード番号(裏面の券面番号)の登録ステップ。
- * 入力された券面番号は 8 バイト IDi へ変換して確定する。
- * カメラで券面を読み取って入力欄にプリフィルできる(結果は必ず人が確認して確定)。
- * カメラが使えない環境(非 HTTPS 等)では手入力のみ。
+ * Card number (printed on the back) registration step.
+ * The entered card number is converted to the 8-byte IDi and confirmed.
+ * The camera can read the card to prefill the input (a human always confirms the result).
+ * Manual entry only where the camera is unavailable (non-HTTPS, etc.).
  */
 export function IdiStep({ onDone }: Props) {
   const [mode, setMode] = useState<"manual" | "camera">(() =>
@@ -38,24 +38,24 @@ export function IdiStep({ onDone }: Props) {
     try {
       onDone({ cardNumber, idi });
     } catch {
-      setError("登録処理に失敗しました。もう一度お試しください。");
+      setError("Registration failed. Please try again.");
       setBusy(false);
     }
   };
 
   return (
     <section className="card">
-      <h2 className="card__title">1. カード番号を登録</h2>
+      <h2 className="card__title">1. Register card number</h2>
       <p className="card__desc">
-        お手持ちの交通系 IC カード<strong>裏面右下</strong>に記載の
-        <strong>ID 番号</strong>(例 NR807 E200 1060 0517)を登録します。
+        Register the <strong>ID number</strong> printed at the
+        <strong>bottom right of the back</strong> of your transit IC card (e.g. NR807 E200 1060 0517).
       </p>
 
       {mode === "camera" ? (
         <CardScanner
           onResult={(text) => {
             setRaw(formatCardNumber(text));
-            setNotice("読み取り結果を確認し、間違いがあれば修正してください。");
+            setNotice("Please check the scanned result and fix any mistakes.");
             setMode("manual");
           }}
           onError={(msg) => setNotice(msg)}
@@ -64,7 +64,7 @@ export function IdiStep({ onDone }: Props) {
       ) : (
         <>
           <label className="field">
-            <span className="field__label">カード番号(裏面右下の ID)</span>
+            <span className="field__label">Card number (ID at bottom right of back)</span>
             <input
               className="field__input"
               inputMode="text"
@@ -84,7 +84,7 @@ export function IdiStep({ onDone }: Props) {
             <p className={`field__check ${valid ? "field__check--ok" : ""}`}>
               {valid
                 ? `✓ ${formatCardNumber(cardNumber)}`
-                : "カード裏面右下の ID 番号を確認してください(対応外の発行会社の可能性)"}
+                : "Check the ID number at the bottom right of the card back (the issuer may be unsupported)"}
             </p>
           )}
 
@@ -92,26 +92,26 @@ export function IdiStep({ onDone }: Props) {
           {error && <p className="field__error">{error}</p>}
 
           <button className="btn btn--primary btn--big" disabled={!valid || busy} onClick={submit}>
-            {busy ? "処理中…" : "この番号で登録する"}
+            {busy ? "Processing…" : "Register this number"}
           </button>
 
           {cameraAvailable() && (
             <button className="btn btn--ghost" onClick={() => setMode("camera")}>
-              カメラで読み取る
+              Scan with camera
             </button>
           )}
         </>
       )}
 
       <p className="card__note">
-        番号はこの端末内にのみ保存されます。撮影画像もこの端末内でのみ処理され、
-        外部へ送信されることはありません。
+        The number is stored only on this device. Captured images are also processed
+        only on this device and are never sent externally.
       </p>
     </section>
   );
 }
 
-/** 券面スキャナ: 背面カメラ + カードガイド枠 + ID 行 ROI の OCR */
+/** Card scanner: rear camera + card guide frame + OCR of the ID line ROI */
 function CardScanner({
   onResult,
   onError,
@@ -156,8 +156,8 @@ function CardScanner({
     };
   }, []);
 
-  // ガイド枠(コンテナ座標系・割合): 幅 90%、カード比率、中央
-  const guide = { w: 0.9, x: 0.05, y: 0 }; // y は実行時に高さから算出
+  // Guide frame (container coords, fractions): 90% width, card aspect, centered
+  const guide = { w: 0.9, x: 0.05, y: 0 }; // y is computed from the height at runtime
 
   const capture = async () => {
     const v = videoRef.current;
@@ -171,12 +171,12 @@ function CardScanner({
       const gh = gw / CARD_ASPECT;
       const gx = guide.x * cw;
       const gy = (ch - gh) / 2;
-      // ID 行(ガイド枠に対する割合 → コンテナ座標)
+      // ID line (fractions of the guide frame -> container coords)
       const ix = gx + ID_ROI.x0 * gw;
       const iy = gy + ID_ROI.y0 * gh;
       const iw = (ID_ROI.x1 - ID_ROI.x0) * gw;
       const ih = (ID_ROI.y1 - ID_ROI.y0) * gh;
-      // object-fit: cover の写像でコンテナ座標 → 動画ピクセル座標
+      // Map container coords -> video pixel coords via object-fit: cover
       const s = Math.max(cw / v.videoWidth, ch / v.videoHeight);
       const dx = (v.videoWidth * s - cw) / 2;
       const dy = (v.videoHeight * s - ch) / 2;
@@ -196,10 +196,10 @@ function CardScanner({
       if (text.length >= 8) {
         onResult(text);
       } else {
-        onError("読み取れませんでした。明るい場所で、枠にぴったり合わせてもう一度お試しください。");
+        onError("Couldn't read the card. Try again in a bright spot, aligned tightly with the frame.");
       }
     } catch {
-      onError("読み取りに失敗しました。手入力もご利用いただけます。");
+      onError("Scan failed. You can also enter the number manually.");
     } finally {
       setReading(false);
     }
@@ -211,14 +211,14 @@ function CardScanner({
         {state !== "failed" ? (
           <video ref={videoRef} className="scan__video" autoPlay playsInline muted />
         ) : (
-          <div className="scan__failed">カメラを起動できませんでした</div>
+          <div className="scan__failed">Couldn't start the camera</div>
         )}
-        {/* カードガイド枠 + ID 行ハイライト */}
+        {/* Card guide frame + ID line highlight */}
         <div className="scan__guide">
           <div className="scan__idbox" />
         </div>
         <div className="scan__caption">
-          カード<strong>裏面</strong>を枠の中に合わせてください
+          Align the <strong>back</strong> of the card within the frame
         </div>
       </div>
       <div className="scan__actions">
@@ -227,10 +227,10 @@ function CardScanner({
           disabled={state !== "on" || reading}
           onClick={capture}
         >
-          {reading ? "読み取り中…" : "読み取る"}
+          {reading ? "Scanning…" : "Scan"}
         </button>
         <button className="btn btn--ghost" onClick={onManual}>
-          手で入力する
+          Enter manually
         </button>
       </div>
     </div>

@@ -1,17 +1,17 @@
-//! SuiCash 管理GUI(母艦 PC の独立ネイティブアプリ)。
+//! SuiCash admin GUI (standalone native app for the host PC).
 //!
-//! 本家 Hi-CARA の管理ソフトのように、母艦 PC 上で単体起動して決済端末を
-//! 操作する。ブラウザは使わず、facepay デーモンの WebSocket(:8899)へ
-//! クライアントとして接続する(端末と同じ配信を受ける)。
+//! Like the official Hi-CARA admin software, it runs standalone on the host PC to
+//! operate the payment terminal. No browser: it connects to the facepay daemon's
+//! WebSocket (:8899) as a client (receiving the same broadcast as the terminal).
 //!
-//!   facepay デーモン(:8899)
-//!     ├─ Hi-CARA 端末(WebView)   … 顔認証・改札LCD
-//!     └─ この管理GUI               … 状態表示・決済待機/残高照会の切替
+//!   facepay daemon (:8899)
+//!     ├─ Hi-CARA terminal (WebView) … face auth, gate LCD
+//!     └─ this admin GUI             … status display, payment/balance mode switch
 //!
-//! 受信: mode / status / card / paymentResult / detecting / cardRemoved
-//! 送信: {"type":"op","cmd":"pay","sui":<f64>} / {"type":"op","cmd":"idle"}
+//! Receives: mode / status / card / paymentResult / detecting / cardRemoved
+//! Sends: {"type":"op","cmd":"pay","sui":<f64>} / {"type":"op","cmd":"idle"}
 //!
-//! 環境変数 FACEPAY_ADMIN_WS で接続先を変更可能(既定 ws://127.0.0.1:8899)。
+//! The endpoint can be changed with FACEPAY_ADMIN_WS (default ws://127.0.0.1:8899).
 
 use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
@@ -26,19 +26,19 @@ use eframe::egui;
 
 const DEFAULT_WS: &str = "ws://127.0.0.1:8899";
 
-/// GUI とWS スレッドで共有する状態
+/// State shared between the GUI and WS threads
 #[derive(Default)]
 struct Shared {
     connected: bool,
-    /// "payment" or "idle"(daemon status より)
+    /// "payment" or "idle" (from daemon status)
     mode: String,
     amount_mist: Option<u64>,
     idi: Option<String>,
-    /// 端末+GUI の接続数
+    /// Number of connections (terminals + GUI)
     clients: usize,
     registered: Option<bool>,
     balance_mist: Option<u128>,
-    /// 端末側フェーズ(detecting/card/removed など、ログ用)
+    /// Terminal-side phase (detecting/card/removed etc., for logging)
     last_event: String,
     last_payment: Option<PaymentView>,
     log: Vec<String>,
@@ -69,11 +69,11 @@ fn push_log(s: &State, line: impl Into<String>) {
     }
 }
 
-// -------------------------------------------------------------- WS クライアント
+// -------------------------------------------------------------- WS client
 
 fn ws_thread(url: String, state: State, rx: Receiver<String>, ctx: egui::Context) {
     loop {
-        push_log(&state, format!("接続中… {url}"));
+        push_log(&state, format!("Connecting… {url}"));
         match tungstenite::connect(&url) {
             Ok((mut ws, _)) => {
                 if let tungstenite::stream::MaybeTlsStream::Plain(s) = ws.get_ref() {
@@ -83,11 +83,11 @@ fn ws_thread(url: String, state: State, rx: Receiver<String>, ctx: egui::Context
                     let mut g = state.lock().unwrap();
                     g.connected = true;
                 }
-                push_log(&state, "デーモンに接続しました");
+                push_log(&state, "Connected to daemon");
                 ctx.request_repaint();
 
                 loop {
-                    // 送信キューを掃き出す
+                    // Flush the send queue
                     let mut send_err = false;
                     while let Ok(msg) = rx.try_recv() {
                         if ws.send(tungstenite::Message::Text(msg)).is_err() {
@@ -109,14 +109,14 @@ fn ws_thread(url: String, state: State, rx: Receiver<String>, ctx: egui::Context
                             if e.kind() == std::io::ErrorKind::WouldBlock
                                 || e.kind() == std::io::ErrorKind::TimedOut => {}
                         Err(e) => {
-                            push_log(&state, format!("受信エラー: {e}"));
+                            push_log(&state, format!("Receive error: {e}"));
                             break;
                         }
                     }
                 }
             }
             Err(e) => {
-                push_log(&state, format!("接続失敗: {e}"));
+                push_log(&state, format!("Connection failed: {e}"));
             }
         }
         {
@@ -124,7 +124,7 @@ fn ws_thread(url: String, state: State, rx: Receiver<String>, ctx: egui::Context
             g.connected = false;
         }
         ctx.request_repaint();
-        // 送信キューが溜まらないよう、切断中も破棄しながら少し待つ
+        // Wait a bit, discarding queued sends while disconnected so the queue doesn't build up
         while rx.try_recv().is_ok() {}
         thread::sleep(Duration::from_secs(2));
     }
@@ -178,25 +178,25 @@ fn handle_message(state: &State, text: &str) {
                 g.idi = get_str(&v, "idi");
                 g.registered = v.get("registered").and_then(|x| x.as_bool());
                 g.balance_mist = get_u128(&v, "balance");
-                g.last_event = "カード検出".into();
+                g.last_event = "Card detected".into();
             }
             let idi = get_str(&v, "idi").unwrap_or_default();
             let reg = v.get("registered").and_then(|x| x.as_bool()).unwrap_or(false);
             push_log(
                 state,
-                format!("カード IDi={idi} 登録={}", if reg { "済" } else { "未" }),
+                format!("Card IDi={idi} registered={}", if reg { "yes" } else { "no" }),
             );
         }
         "detecting" => {
-            state.lock().unwrap().last_event = "認証中…".into();
-            push_log(state, "端末: 認証中…");
+            state.lock().unwrap().last_event = "Authenticating…".into();
+            push_log(state, "Terminal: authenticating…");
         }
         "cardRemoved" => {
             let mut g = state.lock().unwrap();
             g.idi = None;
             g.registered = None;
             g.balance_mist = None;
-            g.last_event = "カードなし".into();
+            g.last_event = "No card".into();
         }
         "paymentResult" => {
             let pv = PaymentView {
@@ -208,13 +208,13 @@ fn handle_message(state: &State, text: &str) {
             };
             let line = if pv.ok {
                 format!(
-                    "決済成功 {} SUI  digest={}",
+                    "Payment succeeded {} SUI  digest={}",
                     mist_to_sui(pv.amount_mist as u128),
                     pv.digest.clone().unwrap_or_default()
                 )
             } else {
                 format!(
-                    "決済失敗 {} SUI  {}",
+                    "Payment failed {} SUI  {}",
                     mist_to_sui(pv.amount_mist as u128),
                     pv.error.clone().unwrap_or_default()
                 )
@@ -226,9 +226,9 @@ fn handle_message(state: &State, text: &str) {
     }
 }
 
-// -------------------------------------------------------- デーモン自動起動
+// -------------------------------------------------------- Daemon auto-start
 
-/// 既に facepay デーモンが :port で待受中か
+/// Whether a facepay daemon is already listening on :port
 fn daemon_running(host: &str, port: u16) -> bool {
     TcpStream::connect_timeout(
         &format!("{host}:{port}")
@@ -239,7 +239,7 @@ fn daemon_running(host: &str, port: u16) -> bool {
     .is_ok()
 }
 
-/// facepay バイナリの場所を解決する
+/// Resolve the location of the facepay binary
 fn find_facepay_bin() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("FACEPAY_BIN") {
         let p = PathBuf::from(p);
@@ -252,22 +252,22 @@ fn find_facepay_bin() -> Option<PathBuf> {
         "usb-poc/target/debug/facepay".into(),
         "../usb-poc/target/debug/facepay".into(),
     ];
-    // 管理GUI 実行ファイル(facepay-admin/target/debug/facepay-admin)から見た相対
+    // Relative to the admin GUI executable (facepay-admin/target/debug/facepay-admin)
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             candidates.push(dir.join("../../../usb-poc/target/debug/facepay"));
             candidates.push(dir.join("../../../usb-poc/target/release/facepay"));
         }
     }
-    // current_dir を設定して子を起動するため、必ず絶対パスに正規化する
-    // (相対 program パスは新 cwd 基準で解決され ENOENT になるため)
+    // The child is spawned with current_dir set, so always normalize to an absolute path
+    // (a relative program path would resolve against the new cwd and fail with ENOENT)
     candidates
         .into_iter()
         .find(|c| c.exists())
         .and_then(|c| c.canonicalize().ok())
 }
 
-/// 子プロセスを終了時に確実に kill するガード
+/// Guard that reliably kills the child process on exit
 struct DaemonGuard(Child);
 impl Drop for DaemonGuard {
     fn drop(&mut self) {
@@ -276,9 +276,9 @@ impl Drop for DaemonGuard {
     }
 }
 
-/// facepay デーモンを子プロセスとして起動し、stderr をログへ流す
+/// Spawn the facepay daemon as a child process and forward its stderr to the log
 fn spawn_daemon(state: &State, bin: &PathBuf) -> Option<DaemonGuard> {
-    // sui-pay.mjs をデーモン側でも解決できるよう、リポジトリ直下を cwd にする
+    // Use the repo root as cwd so the daemon can resolve sui-pay.mjs too
     let cwd = bin
         .ancestors()
         .nth(3) // usb-poc/target/debug/facepay -> repo root
@@ -287,9 +287,9 @@ fn spawn_daemon(state: &State, bin: &PathBuf) -> Option<DaemonGuard> {
     if let Some(cwd) = &cwd {
         cmd.current_dir(cwd);
     }
-    // stdin は閉じる(GUI は WS 経由で操作するため、デーモンの stdin CLI は不要)
+    // Close stdin (the GUI operates via WS, so the daemon's stdin CLI is not needed)
     cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::piped());
-    // GUI(親)が死んだらデーモン(子)も確実に落とす。Drop での kill に加えた保険。
+    // Make sure the daemon (child) dies if the GUI (parent) dies. A safety net on top of the kill in Drop.
     #[cfg(target_os = "linux")]
     unsafe {
         use std::os::unix::process::CommandExt;
@@ -300,7 +300,7 @@ fn spawn_daemon(state: &State, bin: &PathBuf) -> Option<DaemonGuard> {
     }
     match cmd.spawn() {
         Ok(mut child) => {
-            push_log(state, format!("デーモン起動: {}", bin.display()));
+            push_log(state, format!("Daemon started: {}", bin.display()));
             if let Some(err) = child.stderr.take() {
                 let state = state.clone();
                 thread::spawn(move || {
@@ -312,7 +312,7 @@ fn spawn_daemon(state: &State, bin: &PathBuf) -> Option<DaemonGuard> {
             Some(DaemonGuard(child))
         }
         Err(e) => {
-            push_log(state, format!("デーモン起動失敗: {e}"));
+            push_log(state, format!("Failed to start daemon: {e}"));
             None
         }
     }
@@ -324,7 +324,7 @@ struct App {
     state: State,
     tx: Sender<String>,
     sui_input: String,
-    /// GUI が起動したデーモン(外部起動時は None)。Drop で kill。
+    /// Daemon spawned by the GUI (None if started externally). Killed on Drop.
     _daemon: Option<DaemonGuard>,
 }
 
@@ -336,7 +336,7 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // WS スレッドが request_repaint するが、保険で定期再描画
+        // The WS thread calls request_repaint, but repaint periodically as a fallback
         ctx.request_repaint_after(Duration::from_millis(500));
 
         let snap = {
@@ -355,17 +355,17 @@ impl eframe::App for App {
         };
         let (connected, mode, amount_mist, idi, clients, registered, balance, last_event, last_pay) =
             snap;
-        let terminals = clients.saturating_sub(1); // 自分(GUI)を除く端末数の目安
+        let terminals = clients.saturating_sub(1); // approximate terminal count, excluding this GUI
 
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                ui.heading("SuiCash 決済端末 管理");
+                ui.heading("SuiCash Payment Terminal Admin");
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     let (col, label) = if connected {
-                        (egui::Color32::from_rgb(0x3B, 0xD1, 0x6F), "デーモン接続中")
+                        (egui::Color32::from_rgb(0x3B, 0xD1, 0x6F), "Daemon connected")
                     } else {
-                        (egui::Color32::from_rgb(0xE0, 0x5B, 0x5B), "デーモン未接続")
+                        (egui::Color32::from_rgb(0xE0, 0x5B, 0x5B), "Daemon disconnected")
                     };
                     ui.colored_label(col, format!("● {label}"));
                 });
@@ -374,53 +374,53 @@ impl eframe::App for App {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            // ---- 現在の運用モード ----
+            // ---- Current operating mode ----
             egui::Frame::group(ui.style()).show(ui, |ui| {
-                ui.label(egui::RichText::new("運用モード").strong());
+                ui.label(egui::RichText::new("Operating mode").strong());
                 ui.add_space(4.0);
                 if mode == "payment" {
                     let sui = mist_to_sui(amount_mist.unwrap_or(0) as u128);
                     ui.colored_label(
                         egui::Color32::from_rgb(0xFF, 0xB3, 0x4D),
-                        egui::RichText::new(format!("決済待機中 — {sui} SUI")).size(22.0),
+                        egui::RichText::new(format!("Awaiting payment — {sui} SUI")).size(22.0),
                     );
                 } else {
                     ui.colored_label(
                         egui::Color32::from_rgb(0x7F, 0xC8, 0xFF),
-                        egui::RichText::new("残高照会モード").size(22.0),
+                        egui::RichText::new("Balance mode").size(22.0),
                     );
                 }
                 ui.add_space(2.0);
-                ui.label(format!("接続端末: {terminals} 台"));
+                ui.label(format!("Connected terminals: {terminals}"));
             });
 
             ui.add_space(10.0);
 
-            // ---- 現在のカード ----
+            // ---- Current card ----
             egui::Frame::group(ui.style()).show(ui, |ui| {
-                ui.label(egui::RichText::new("現在のカード").strong());
+                ui.label(egui::RichText::new("Current card").strong());
                 ui.add_space(4.0);
                 match &idi {
                     Some(idi) => {
                         ui.monospace(format!("IDi: {idi}"));
                         if let Some(b) = balance {
-                            ui.label(format!("残高: {} SUI", mist_to_sui(b)));
+                            ui.label(format!("Balance: {} SUI", mist_to_sui(b)));
                         }
                         match registered {
                             Some(true) => ui.colored_label(
                                 egui::Color32::from_rgb(0x3B, 0xD1, 0x6F),
-                                "登録済み",
+                                "Registered",
                             ),
                             Some(false) => ui.colored_label(
                                 egui::Color32::from_rgb(0xE0, 0x9B, 0x3B),
-                                "未登録(要チャージ)",
+                                "Not registered (top-up required)",
                             ),
                             None => ui.label(""),
                         };
                     }
                     None => {
                         ui.weak(if last_event.is_empty() {
-                            "カード未検出".to_string()
+                            "No card detected".to_string()
                         } else {
                             last_event.clone()
                         });
@@ -430,12 +430,12 @@ impl eframe::App for App {
 
             ui.add_space(10.0);
 
-            // ---- 操作 ----
+            // ---- Controls ----
             egui::Frame::group(ui.style()).show(ui, |ui| {
-                ui.label(egui::RichText::new("操作").strong());
+                ui.label(egui::RichText::new("Controls").strong());
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
-                    ui.label("金額(SUI):");
+                    ui.label("Amount (SUI):");
                     ui.add(
                         egui::TextEdit::singleline(&mut self.sui_input)
                             .desired_width(90.0)
@@ -443,7 +443,7 @@ impl eframe::App for App {
                     );
                     let can_pay = connected && self.sui_input.trim().parse::<f64>().map(|v| v > 0.0).unwrap_or(false);
                     if ui
-                        .add_enabled(can_pay, egui::Button::new("決済待機にする"))
+                        .add_enabled(can_pay, egui::Button::new("Await payment"))
                         .clicked()
                     {
                         if let Ok(sui) = self.sui_input.trim().parse::<f64>() {
@@ -455,7 +455,7 @@ impl eframe::App for App {
                 });
                 ui.add_space(6.0);
                 if ui
-                    .add_enabled(connected, egui::Button::new("残高照会モードに戻す"))
+                    .add_enabled(connected, egui::Button::new("Back to balance mode"))
                     .clicked()
                 {
                     self.send_op(r#"{"type":"op","cmd":"idle"}"#.to_string());
@@ -464,17 +464,17 @@ impl eframe::App for App {
 
             ui.add_space(10.0);
 
-            // ---- 直近の決済結果 ----
+            // ---- Latest payment result ----
             if let Some(p) = &last_pay {
                 egui::Frame::group(ui.style()).show(ui, |ui| {
-                    ui.label(egui::RichText::new("直近の決済").strong());
+                    ui.label(egui::RichText::new("Latest payment").strong());
                     ui.add_space(4.0);
                     if p.ok {
                         ui.colored_label(
                             egui::Color32::from_rgb(0x3B, 0xD1, 0x6F),
-                            format!("成功: {} SUI", mist_to_sui(p.amount_mist as u128)),
+                            format!("Succeeded: {} SUI", mist_to_sui(p.amount_mist as u128)),
                         );
-                        ui.label(format!("決済後残高: {} SUI", mist_to_sui(p.balance_after_mist)));
+                        ui.label(format!("Balance after payment: {} SUI", mist_to_sui(p.balance_after_mist)));
                         if let Some(d) = &p.digest {
                             ui.monospace(format!("digest: {d}"));
                         }
@@ -482,8 +482,8 @@ impl eframe::App for App {
                         ui.colored_label(
                             egui::Color32::from_rgb(0xE0, 0x5B, 0x5B),
                             format!(
-                                "失敗: {}",
-                                p.error.clone().unwrap_or_else(|| "エラー".into())
+                                "Failed: {}",
+                                p.error.clone().unwrap_or_else(|| "Error".into())
                             ),
                         );
                     }
@@ -491,8 +491,8 @@ impl eframe::App for App {
                 ui.add_space(10.0);
             }
 
-            // ---- ログ ----
-            ui.label(egui::RichText::new("ログ").strong());
+            // ---- Log ----
+            ui.label(egui::RichText::new("Log").strong());
             egui::ScrollArea::vertical()
                 .max_height(160.0)
                 .stick_to_bottom(true)
@@ -516,7 +516,7 @@ fn install_japanese_font(ctx: &egui::Context) {
         "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
     ];
     let Some(bytes) = CANDIDATES.iter().find_map(|p| std::fs::read(p).ok()) else {
-        eprintln!("日本語フォントが見つかりません(文字化けする可能性があります)");
+        eprintln!("Japanese font not found (CJK text may not render)");
         return;
     };
     let mut fonts = egui::FontDefinitions::default();
@@ -531,7 +531,7 @@ fn install_japanese_font(ctx: &egui::Context) {
 
 fn main() -> eframe::Result<()> {
     let url = std::env::var("FACEPAY_ADMIN_WS").unwrap_or_else(|_| DEFAULT_WS.to_string());
-    // 接続先ポートを URL から取り出す(デーモン起動判定用)
+    // Extract the port from the URL (to check whether the daemon is running)
     let (ws_host, ws_port) = url::Url::parse(&url)
         .ok()
         .map(|u| {
@@ -545,8 +545,8 @@ fn main() -> eframe::Result<()> {
     let state: State = Arc::new(Mutex::new(Shared::default()));
     let (tx, rx) = channel::<String>();
 
-    // 起動しただけで全機能が有効化されるよう、デーモン未稼働なら自分で起動する。
-    // FACEPAY_ADMIN_NO_SPAWN=1 で無効化(外部で facepay を回す運用向け)。
+    // Start the daemon ourselves if it isn't running, so launching enables everything.
+    // Disable with FACEPAY_ADMIN_NO_SPAWN=1 (for setups running facepay externally).
     let no_spawn = std::env::var("FACEPAY_ADMIN_NO_SPAWN").ok().as_deref() == Some("1");
     let daemon = if !no_spawn && !daemon_running(&ws_host, ws_port) {
         match find_facepay_bin() {
@@ -554,13 +554,13 @@ fn main() -> eframe::Result<()> {
             None => {
                 push_log(
                     &state,
-                    "facepay バイナリが見つかりません(FACEPAY_BIN で指定可)。外部デーモンに接続を試みます。",
+                    "facepay binary not found (set FACEPAY_BIN). Trying to connect to an external daemon.",
                 );
                 None
             }
         }
     } else {
-        push_log(&state, "既存のデーモンに接続します");
+        push_log(&state, "Connecting to existing daemon");
         None
     };
 
@@ -568,13 +568,13 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([460.0, 720.0])
             .with_min_inner_size([380.0, 520.0])
-            .with_title("SuiCash 管理"),
+            .with_title("SuiCash Admin"),
         ..Default::default()
     };
 
     let state_for_app = state.clone();
     eframe::run_native(
-        "SuiCash 管理",
+        "SuiCash Admin",
         options,
         Box::new(move |cc| {
             install_japanese_font(&cc.egui_ctx);

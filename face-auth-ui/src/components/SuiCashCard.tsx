@@ -1,9 +1,9 @@
 /**
- * SuiCash プリペイドカードの券面。assets/card/suicash-card.svg と同一デザイン。
- * - 地はシルバー、左にテーマカラー(アクア #4DA2FF 系)の台形パネル
- * - ワードマークはパネル内左下、assets/logo/suicash-logo.svg と同じ組み方(REM 605、iC のみアウトライン)
- * - マスコットは assets/mascot/suicash-mascot.svg をインライン縮小配置
- *   (外部 SVG を <img> で読むと Web フォントが遮断されるため全てインラインで組む)
+ * Card face of the SuiCash prepaid card. Same design as assets/card/suicash-card.svg.
+ * - Silver background with a trapezoidal panel in the theme color (aqua, #4DA2FF family) on the left
+ * - Wordmark at the panel's bottom left, set the same way as assets/logo/suicash-logo.svg (REM 605, only iC outlined)
+ * - Mascot is assets/mascot/suicash-mascot.svg, inlined and scaled down
+ *   (everything is inlined because loading an external SVG via <img> blocks web fonts)
  */
 export function SuiCashCard({ className }: { className?: string }) {
   return (
@@ -11,7 +11,7 @@ export function SuiCashCard({ className }: { className?: string }) {
       viewBox="0 0 172 108"
       className={className}
       role="img"
-      aria-label="SuiCash カード"
+      aria-label="SuiCash card"
     >
       <defs>
         <linearGradient id="scSilver" x1="0" y1="0" x2="0" y2="1">
@@ -28,19 +28,19 @@ export function SuiCashCard({ className }: { className?: string }) {
       </defs>
 
       <g clipPath="url(#scCardClip)">
-        {/* 下地(シルバー) */}
+        {/* Base (silver) */}
         <rect x="0" y="0" width="172" height="108" fill="url(#scSilver)" />
 
-        {/* 台形パネル(テーマカラーのアクア) */}
+        {/* Trapezoidal panel (theme-color aqua) */}
         <path
           d="M 12 7 H 76 Q 80 7 81.2 10.8 L 108.8 98.2 Q 110 102 106 102 H 12 Q 7 102 7 97 V 12 Q 7 7 12 7 Z"
           fill="url(#scAqua)"
         />
 
-        {/* 左上の挿入方向マーク */}
+        {/* Insertion-direction mark, top left */}
         <path d="M 15 2.2 L 10.4 4.3 L 15 6.4 Z" fill="#0a1a2f" opacity="0.7" />
 
-        {/* マスコット(assets/mascot/suicash-mascot.svg を埋め込み) */}
+        {/* Mascot (embedded from assets/mascot/suicash-mascot.svg) */}
         <g transform="translate(110 36.4) scale(0.113)">
           <g fill="none" strokeLinecap="round">
             <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" strokeWidth="78" />
@@ -83,7 +83,7 @@ export function SuiCashCard({ className }: { className?: string }) {
           </g>
         </g>
 
-        {/* ワードマーク: 台形パネル内の左下に白で(iC はアウトライン) */}
+        {/* Wordmark: white, bottom left inside the trapezoidal panel (iC outlined) */}
         <text
           x="12"
           y="94"

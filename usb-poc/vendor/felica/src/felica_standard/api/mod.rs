@@ -306,9 +306,9 @@ fn felica_bitrate_preference(bitrate: &str) -> u8 {
 /// Rejects Polling request codes and time slot counts that §4.4.2 does not define.
 ///
 /// Request codes other than `00h`/`01h`/`02h` are reserved, and the specification
-/// is explicit that only the five listed time slot values may be sent: "タイム
-/// スロット値は、規定値（00h、01h、03h、07h、0Fh）のみ指定してください。規定値以外
-/// の値を設定した場合、製品によって動作が異なる場合があります" (§4.4.2, table 4-6).
+/// is explicit that only the five listed time slot values may be sent: "Specify
+/// only the defined time slot values (00h, 01h, 03h, 07h, 0Fh). If any other
+/// value is set, behavior may differ between products" (§4.4.2, table 4-6).
 /// A reserved value therefore has no portable meaning, and the response timeout a
 /// driver derives from the slot count would not match the card's actual response
 /// window either.

@@ -1471,8 +1471,8 @@ fn describe_data_rate(data_rate: &str) -> String {
 /// Best-effort friendly names for a few widely deployed FeliCa system codes.
 fn describe_system_code(system_code_hex: &str) -> Option<&'static str> {
     match system_code_hex {
-        "0x0003" => Some("交通系IC (Suica / PASMO / ICOCA など)"),
-        "0xFE00" => Some("共通領域 (Edy / nanaco / WAON / QUICPay など)"),
+        "0x0003" => Some("Transit IC (Suica / PASMO / ICOCA, etc.)"),
+        "0xFE00" => Some("Common area (Edy / nanaco / WAON / QUICPay, etc.)"),
         "0x88B4" => Some("FeliCa Lite-S"),
         "0x957A" => Some("FeliCa Plug / NFC Dynamic Tag"),
         _ => None,

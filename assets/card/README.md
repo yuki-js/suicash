@@ -1,11 +1,13 @@
-# SuiCash カード券面
+# SuiCash card face
 
-`suicash-card.svg` — SuiCash プリペイドカードの券面(交通系 IC カード風の
-オリジナルデザイン)。地はシルバー、左にテーマカラー(アクア #4DA2FF 系)の
-台形パネル、その左下にワードマーク、右にマスコットを配置。viewBox は 172×108。
+`suicash-card.svg` — card face of the SuiCash prepaid card (an original design in the style of
+transit IC cards). Silver background with a trapezoidal panel in the theme color (aqua, #4DA2FF
+family) on the left, the wordmark at the panel's bottom left, and the mascot on the right.
+viewBox is 172×108.
 
-- `face-auth-ui/src/components/SuiCashCard.tsx` のインライン SVG を単独ファイル化したもの。
-- ワードマークは [`../logo/suicash-logo.svg`](../logo/suicash-logo.svg) と同じ REM 605 の組み方。
-  フォントは Google Fonts から `@import` で読み込む(オフラインでは sans-serif にフォールバック)。
-- マスコットは [`../mascot/suicash-mascot.svg`](../mascot/suicash-mascot.svg) を縮小配置。
-- `suicash-card-in.gif` — カードをリーダーへ挿入するループアニメーション(透過背景、465×487)。
+- Standalone file version of the inline SVG in `face-auth-ui/src/components/SuiCashCard.tsx`.
+- The wordmark is set in REM 605, the same as [`../logo/suicash-logo.svg`](../logo/suicash-logo.svg).
+  The font is loaded from Google Fonts via `@import` (falls back to sans-serif offline).
+- The mascot is [`../mascot/suicash-mascot.svg`](../mascot/suicash-mascot.svg), scaled down.
+- `suicash-card-in.gif` — looping animation of the card being inserted into the reader
+  (transparent background, 465×487).

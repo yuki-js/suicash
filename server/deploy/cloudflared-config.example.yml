@@ -1,13 +1,13 @@
-# cloudflared(Cloudflare Tunnel)設定例。
-# 設置: /etc/cloudflared/config.yml
+# Example cloudflared (Cloudflare Tunnel) config.
+# Install to: /etc/cloudflared/config.yml
 #
-# 手順(下の deploy/README.md 参照):
+# Steps (see deploy/README.md):
 #   cloudflared tunnel login
-#   cloudflared tunnel create felica-oracle      # → <TUNNEL_ID> と credentials json
+#   cloudflared tunnel create felica-oracle      # → <TUNNEL_ID> and credentials json
 #   cloudflared tunnel route dns felica-oracle felica-oracle.example.com
-#   sudo cloudflared service install              # このファイルを使って常駐
+#   sudo cloudflared service install              # runs as a service using this file
 #
-# <TUNNEL_ID> と hostname は自分の値に置き換えること。
+# Replace <TUNNEL_ID> and hostname with your own values.
 
 tunnel: <TUNNEL_ID>
 credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
@@ -16,9 +16,9 @@ ingress:
   - hostname: felica-oracle.example.com
     service: http://127.0.0.1:3000
     originRequest:
-      # 証明生成 attest は数秒かかることがある。原点への接続/応答待ちを緩める。
+      # attest (proof generation) can take several seconds. Relax origin connect/response waits.
       connectTimeout: 10s
-      # 無応答判定を証明時間より長く(Cloudflare エッジ自体は最大100秒)
+      # Keep the no-response timeout longer than proof time (the Cloudflare edge caps at 100s)
       httpHostHeader: felica-oracle.example.com
-  # それ以外は 404
+  # Everything else: 404
   - service: http_status:404

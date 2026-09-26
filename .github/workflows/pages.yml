@@ -1,12 +1,12 @@
 name: Deploy site + regist-web to GitHub Pages
 
-# main の site/** か regist-web/** に push(またはマージ)されると、Actions が
-# 1 つの成果物にまとめて GitHub Pages に公開する(HTTPS 付き = カメラ OCR も動く)。
-#   /      … site/(紹介ランディングページ・ビルド不要の静的 HTML)
-#   /app/  … regist-web/dist(登録サイト)
-# main はデフォルトブランチなので github-pages 環境の既定ポリシーで許可され、
-# 環境のブランチ保護設定を触らずにデプロイできる。
-# 公開 URL: https://yuki-js.github.io/suicash/ (登録サイトは …/suicash/app/)
+# When site/** or regist-web/** on main is pushed (or merged), Actions bundles
+# them into one artifact and publishes it to GitHub Pages (served over HTTPS, so camera OCR works).
+#   /      … site/ (landing page; static HTML, no build step)
+#   /app/  … regist-web/dist (registration site)
+# main is the default branch, so the github-pages environment's default policy
+# allows it and we can deploy without touching environment branch protection.
+# Public URL: https://yuki-js.github.io/suicash/ (registration site at …/suicash/app/)
 on:
   push:
     branches: [main]
@@ -21,7 +21,7 @@ permissions:
   pages: write
   id-token: write
 
-# Pages への同時デプロイは 1 本に(進行中はキャンセルせず順番待ち)
+# Only one concurrent Pages deploy (queue instead of cancelling in-progress runs)
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -44,9 +44,9 @@ jobs:
       - run: npm ci --no-audit --no-fund
 
       - name: Build
-        # チャージのトレジャリー鍵や RPC/faucet はビルド時に埋め込める
-        # (GitHub → Settings → Secrets and variables → Actions)。
-        # 省略時は実行時の URL クエリ(?treasury=/?rpc=/?faucet=)注入でも可。
+        # The top-up treasury key and RPC/faucet can be baked in at build time
+        # (GitHub -> Settings -> Secrets and variables -> Actions).
+        # Otherwise they can be injected at runtime via URL query (?treasury=/?rpc=/?faucet=).
         env:
           VITE_TREASURY_SECRET: ${{ secrets.VITE_TREASURY_SECRET }}
           VITE_SUI_RPC: ${{ vars.VITE_SUI_RPC }}

@@ -1,26 +1,27 @@
-# facepay-admin — SuiCash 母艦 管理ソフト(CLI / GUI)
+# facepay-admin — SuiCash host PC admin tool (CLI / GUI)
 
-決済端末(Hi-CARA)を母艦 PC から運用する管理ソフト。**起動しただけで全機能が
-有効化**され、端末クライアントも adb 経由で自動起動する。CLI と GUI の 2 形態。
+Admin tool for operating the payment terminal (Hi-CARA) from the host PC. **Just launching it
+enables every feature**, and the terminal client is auto-started via adb as well. Comes in two
+forms: CLI and GUI.
 
-いずれも店舗アドレス `FACEPAY_MERCHANT` を付けて起動する(未設定だと決済不可)。
+Either form is launched with the merchant address `FACEPAY_MERCHANT` (payments are disabled if unset).
 
-## CLI(`facepay`)
+## CLI (`facepay`)
 
 ```sh
-# ビルド
+# Build
 cargo build --manifest-path usb-poc/Cargo.toml --bin facepay
 
-# 起動(標準入力で pay <SUI> / idle / status / quit)
+# Run (stdin commands: pay <SUI> / idle / status / quit)
 FACEPAY_MERCHANT=0x… ./usb-poc/target/debug/facepay
 ```
 
-## GUI(`facepay-admin`)
+## GUI (`facepay-admin`)
 
 ```sh
-# ビルド
+# Build
 cargo build --manifest-path facepay-admin/Cargo.toml
 
-# 起動(デーモンと端末も自動で立ち上がる。ウィンドウを閉じると全部止まる)
+# Run (the daemon and terminal start automatically; closing the window stops everything)
 FACEPAY_MERCHANT=0x… ./facepay-admin/target/debug/facepay-admin
 ```

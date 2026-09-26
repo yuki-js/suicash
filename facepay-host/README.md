@@ -1,84 +1,84 @@
-# facepay-host — 決済端末の母艦デーモン
+# facepay-host — host PC daemon for the payment terminal
 
-Hi-CARA 決済端末の PC 側デーモン(Rust)。FeliCa を読み、オラクルで IDi を認証し、
-IDi 導出ウォレットのオンチェーン決済を行い、端末 UI(`../face-auth-ui`)と
-WebSocket で連携する。
+PC-side daemon (Rust) for the Hi-CARA payment terminal. It reads FeliCa, authenticates the
+IDi via the oracle, performs on-chain payments from the IDi-derived wallet, and talks to the
+terminal UI (`../face-auth-ui`) over WebSocket.
 
 ```
 [Suica/PASMO] --RC-S634--> facepay-host --oracle(challenge/settle/attest)--> IDi
                                  │
-                                 ├─ sui-pay.mjs: IDi導出ウォレットの残高照会・送金
+                                 ├─ sui-pay.mjs: balance query / transfer for the IDi-derived wallet
                                  └─ WebSocket(:8899) <--adb reverse--> Hi-CARA WebView
 ```
 
-## 構成
+## Layout
 
-- `src/main.rs` — Rust デーモン: FeliCa 読取 + オラクル認証 + WS サーバ + CLI
-- `sui-pay.mjs` — Node ヘルパー: IDi→ウォレット導出(regist-web と同一方式)・
-  残高照会・送金(`@mysten/sui`)。導出が完全一致することを確認済み
+- `src/main.rs` — Rust daemon: FeliCa reading + oracle authentication + WS server + CLI
+- `sui-pay.mjs` — Node helper: IDi → wallet derivation (same scheme as regist-web),
+  balance query and transfer (`@mysten/sui`). Derivation verified to match exactly.
 
-Rust から Node ヘルパーを呼ぶ二層構成にしているのは、ウォレット導出とトランザクション
-生成を regist-web(`@mysten/sui`)と厳密に一致させ、アドレス不一致を防ぐため。
+The two-layer design (Rust calling a Node helper) keeps wallet derivation and transaction
+building strictly identical to regist-web (`@mysten/sui`), preventing address mismatches.
 
-## セットアップ
+## Setup
 
 ```sh
-npm install                 # sui-pay.mjs の依存(@mysten/sui)
-cargo build --release       # デーモン
+npm install                 # sui-pay.mjs dependency (@mysten/sui)
+cargo build --release       # daemon
 ```
 
-必要: Node.js、Rust、Android SDK の adb、libusb。
+Requires: Node.js, Rust, adb from the Android SDK, libusb.
 
-## 起動
+## Running
 
 ```sh
-# 端末(Hi-CARA)から ws://localhost:8899 に届くようにする
+# Make ws://localhost:8899 reachable from the terminal (Hi-CARA)
 adb reverse tcp:8899 tcp:8899
-# WebView をこの URL で開く(device-shell / 既存シェル)
-#   http://localhost:5173/?ws=ws://localhost:8899   ← face-auth-ui を配信しているURL + ?ws=
+# Open the WebView at this URL (device-shell / existing shell)
+#   http://localhost:5173/?ws=ws://localhost:8899   ← URL serving face-auth-ui + ?ws=
 
-FACEPAY_MERCHANT=0x<店舗アドレス> \
+FACEPAY_MERCHANT=0x<merchant address> \
 FACEPAY_SUI_HELPER=./sui-pay.mjs \
 SUI_RPC=https://sui-testnet-rpc.publicnode.com \
   cargo run --release
 ```
 
-## オペレータ CLI
+## Operator CLI
 
-| コマンド | 動作 |
+| Command | Action |
 | --- | --- |
-| `idle` | 残高照会モード(顔認証後に残高のみ表示) |
-| `pay <SUI>` | 決済待機。顔認証成功で指定額を店舗へ送金し改札LCD風に表示 |
-| `testcard <idiHex>` | リーダー無しで擬似カード投入(検証・デモ用) |
-| `remove` | 擬似カード離脱 |
-| `status` | 現在のモード・カード・端末接続状態 |
-| `quit` | 終了 |
+| `idle` | Balance mode (show balance only after face authentication) |
+| `pay <SUI>` | Wait for payment. On successful face auth, send the amount to the merchant and show it gate-LCD style |
+| `testcard <idiHex>` | Insert a simulated card without a reader (testing/demo) |
+| `remove` | Remove the simulated card |
+| `status` | Current mode, card, and terminal connection state |
+| `quit` | Exit |
 
-## プロトコル(母艦↔端末)
+## Protocol (host PC ↔ terminal)
 
-`../face-auth-ui/src/terminal.ts` と対。母艦→端末は WS で JSON イベント
-(`card` / `mode` / `paymentResult` / `cardRemoved`)、端末→母艦は
-`faceOk` / `faceNg` / `enrolled` / `cancel`。
+Counterpart of `../face-auth-ui/src/terminal.ts`. Host → terminal sends JSON events over WS
+(`card` / `mode` / `paymentResult` / `cardRemoved`); terminal → host sends
+`faceOk` / `faceNg` / `enrolled` / `cancel`.
 
-## 環境変数
+## Environment variables
 
-| 変数 | 既定 | 用途 |
+| Variable | Default | Purpose |
 | --- | --- | --- |
-| `FACEPAY_ORACLE` | felica-oracle.ouchiserver… | オラクル JSON-RPC |
-| `FACEPAY_WS_PORT` | 8899 | WebSocket ポート |
-| `FACEPAY_MERCHANT` | (空) | 決済の送金先(店舗)。未設定だと決済不可 |
-| `FACEPAY_SUI_HELPER` | sui-pay.mjs | Node ヘルパーのパス |
-| `SUI_RPC` | publicnode testnet | fullnode RPC(ヘルパーへ引継) |
+| `FACEPAY_ORACLE` | felica-oracle.ouchiserver… | Oracle JSON-RPC |
+| `FACEPAY_WS_PORT` | 8899 | WebSocket port |
+| `FACEPAY_MERCHANT` | (empty) | Payment recipient (merchant). Payments disabled if unset |
+| `FACEPAY_SUI_HELPER` | sui-pay.mjs | Path to the Node helper |
+| `SUI_RPC` | publicnode testnet | Fullnode RPC (passed to the helper) |
 
-## 登録判定
+## Registration check
 
-「オンチェーン登録あり」は、IDi 導出ウォレットに残高 > 0(regist-web でチャージ済み)
-を代用している。厳密なレジストリ(Move)にするのは今後の課題。
+"Registered on-chain" is approximated by the IDi-derived wallet having a balance > 0
+(topped up via regist-web). A proper registry (Move) is future work.
 
-## 既知の課題: 物理リーダー(RC-S634)
+## Known issue: physical reader (RC-S634)
 
-同梱の Sony RC-S634/UA は USB ID `054C:06C2`。felica-rs の Port-100 ドライバが
-見ている ID は `06C1`/`06C3` のため、現状 `open_reader` が RC-S634 を開けない
-(`testcard` での擬似投入・決済は動作確認済み)。物理カード読取には felica-rs 側の
-リーダー ID 対応、または suica-viewer-cli 併用が要る。オラクル認証・オンチェーン
-決済・WS・UI は検証済み(実送金 digest 確認済み)。
+The bundled Sony RC-S634/UA has USB ID `054C:06C2`. felica-rs's Port-100 driver
+looks for `06C1`/`06C3`, so `open_reader` currently cannot open the RC-S634
+(simulated insertion and payment via `testcard` are verified). Reading physical cards needs
+reader ID support in felica-rs, or using suica-viewer-cli alongside. Oracle authentication,
+on-chain payment, WS, and UI are verified (real transfer digest confirmed).

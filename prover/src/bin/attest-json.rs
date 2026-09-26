@@ -29,7 +29,9 @@ use felica::felica_standard::{
 };
 use hex_literal::hex;
 use prover::des::{des_encrypt, tdes_decrypt, tdes_encrypt};
-use prover::{load_proving_key, prove_compressed, proof_compressed_bytes, public_inputs_bytes, ProveRequest};
+use prover::{
+    load_proving_key, proof_compressed_bytes, prove_compressed, public_inputs_bytes, ProveRequest,
+};
 use rand::RngCore;
 
 /// Fixture card, identical to `felica-fixture` and `tests/common`.
@@ -92,10 +94,13 @@ fn main() {
     );
 }
 
+/// Transcript of one mutual authentication: `(c1b, c2a, auth2, gsk, usk)`.
+type MintTranscript = ([u8; 8], [u8; 8], [u8; 32], [u8; 8], [u8; 8]);
+
 /// One full mutual authentication against the emulated card, with the given
 /// holder challenge. Mirrors `felica-fixture::mint_fixed` but parameterised
 /// over `r1`.
-fn mint(r1: &[u8; 8]) -> ([u8; 8], [u8; 8], [u8; 32], [u8; 8], [u8; 8]) {
+fn mint(r1: &[u8; 8]) -> MintTranscript {
     let (gsk, usk) = generate_service_keys_des(&SYSTEM_KEY, &[AREA_KEY], &[SERVICE_KEY]);
     let mut emusys = EmuSys::new(SYSTEM_CODE, IDM, PMI).expect("system");
     emusys.set_system_key(SYSTEM_KEY);

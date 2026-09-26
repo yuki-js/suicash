@@ -291,12 +291,12 @@ footer ul a:hover{color:var(--aqua-strong)}
 }
 </style>
 <script>
-// 旧 URL(登録サイトがルートにあった頃)の注入クエリ付きリンクは /app/ へ引き継ぐ
+// Forward old-URL links (from when the registration site was at the root) with injected queries to /app/
 (function(){
   var q=new URLSearchParams(location.search);
   if(q.has("treasury")||q.has("rpc")||q.has("faucet")) location.replace("app/"+location.search+location.hash);
 })();
-// 表示言語を先に決めて <html lang> に反映(:lang() の CSS をちらつかせないため)
+// Decide the display language first and set <html lang> (so :lang() CSS does not flicker)
 (function(){
   var q=new URLSearchParams(location.search).get("lang"),saved=null;
   try{saved=localStorage.getItem("suicash-lang")}catch(e){}
@@ -310,7 +310,7 @@ footer ul a:hover{color:var(--aqua-strong)}
 <nav class="nav">
   <div class="wrap">
     <a class="brand" href="#top" aria-label="SuiCash トップへ" data-i18n-aria="nav.home">
-      <!-- ワードマーク(assets/logo/suicash-logo.svg 由来・テーマ対応) -->
+      <!-- Wordmark (from assets/logo/suicash-logo.svg, theme-aware) -->
       <svg width="128" height="30" viewBox="0 0 800.18 182.86" role="img" aria-label="SuiCash">
         <g transform="translate(40 144.376)">
           <text font-family="REM, sans-serif" font-weight="605" font-size="142.857" style="font-variation-settings:'wght' 605;font-variant-ligatures:none" font-kerning="none"><tspan x="-5.808 111.612" y="0" class="wm-solid">Su</tspan><tspan x="228.783 302.358" y="0" class="wm-ic" stroke-width="6.2" stroke-linejoin="miter">iC</tspan><tspan x="430.433 545.590 641.785" y="0" class="wm-solid">ash</tspan></text>
@@ -353,7 +353,7 @@ footer ul a:hover{color:var(--aqua-strong)}
     <div class="card-stage" aria-hidden="true">
       <span class="ping"></span>
       <div class="card-visual">
-        <!-- カード券面(assets/card/suicash-card.svg @ ca05eac) -->
+        <!-- Card face (assets/card/suicash-card.svg @ ca05eac) -->
         <svg viewBox="0 0 172 108" role="img" aria-label="SuiCash カード券面" data-i18n-aria="hero.cardAria">
           <defs>
             <linearGradient id="scSilver" x1="0" y1="0" x2="0" y2="1">
@@ -597,7 +597,7 @@ footer ul a:hover{color:var(--aqua-strong)}
   <div class="wrap">
     <div class="mascot-box">
       <div class="mascot-pod" aria-hidden="true">
-        <!-- マスコット(assets/mascot/suicash-mascot.svg) -->
+        <!-- Mascot (assets/mascot/suicash-mascot.svg) -->
         <svg viewBox="-21.6 -19.3 555.0 555.0" role="img" aria-label="SuiCash マスコット「ちいきも」" data-i18n-aria="mascot.aria">
           <g fill="none" stroke-linecap="round">
             <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" stroke-width="78"/>
@@ -773,7 +773,7 @@ const EN = {
   "foot.sui": "Sui blockchain"
 };
 
-  // 日本語は HTML に書かれた原文をそのまま使う(JS 無効でも日本語で読める)
+  // Japanese uses the source text written in the HTML as-is (readable in Japanese even with JS disabled)
   const JA = {"title": document.title};
   const nodes = {
     html: document.querySelectorAll("[data-i18n]"),

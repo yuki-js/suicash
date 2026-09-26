@@ -1,6 +1,6 @@
 /**
- * SuiCash ワードマーク。assets/logo/suicash-logo.svg と同じ組み方
- * (REM 605、iC のみアウトライン)を HTML インラインで再現する。
+ * SuiCash wordmark. Reproduces the same setting as assets/logo/suicash-logo.svg
+ * (REM 605, only "iC" outlined) inline in HTML.
  */
 export function Logo({ inverted = false }: { inverted?: boolean }) {
   const cls = inverted ? "logo logo--inverted" : "logo";

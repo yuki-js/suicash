@@ -19,16 +19,16 @@ import jp.co.nextware.frcardreader.safr.ESDKWrapper;
 import jp.co.nextware.frcardreader.safr.FaceInfo;
 
 /**
- * 端末組み込みの商用顔認証エンジン(SAFR eSDK)を呼び出すヘルパー。
- * エンジンのバイナリ・モデル・ライセンスは再配布不可のため同梱しない
- * (.gitignore 対象。ビルドする本人が自機からローカルに置く)。
- * JNI ラッパー(jp.co.nextware.frcardreader.safr)のクラス名・フィールド名は
- * エンジンのネイティブ側が RegisterNatives で解決する名前なので変更できない。
+ * Helper that calls the device's built-in commercial face-recognition engine (SAFR eSDK).
+ * The engine binaries, models and license are not redistributable and are not bundled
+ * (gitignored; whoever builds places them locally from their own device).
+ * The JNI wrapper (jp.co.nextware.frcardreader.safr) class and field names
+ * are resolved by the engine's native side via RegisterNatives, so they cannot change.
  *
- *   初期化 : initESDK(LICENSE, モデル展開先, ストア用パス, ConfigOptions)
- *   検出   : detectFaces(bmp, 5)                     … probe(プレビュー用、0°のみ)
- *   登録   : detectFaces(bmp, 5) -> learnPerson      … 多方向リトライあり
- *   照合   : detectFaces(bmp, 5) -> recognizePerson  … 多方向リトライあり
+ *   Init     : initESDK(LICENSE, model dir, store path, ConfigOptions)
+ *   Detect   : detectFaces(bmp, 5)                     … probe (for preview, 0° only)
+ *   Register : detectFaces(bmp, 5) -> learnPerson      … retries multiple orientations
+ *   Match    : detectFaces(bmp, 5) -> recognizePerson  … retries multiple orientations
  */
 public class SafrEngine {
 
@@ -42,11 +42,11 @@ public class SafrEngine {
     private boolean initialized = false;
     private boolean registered = false;
 
-    /** probe の結果(検出のみ。confidence は照合系でのみ入る) */
+    /** Probe result (detection only; confidence is set only for matching) */
     public static class Probe {
         public final boolean found;
-        public final EARDetectedFace face; // found のときのみ
-        public final int rotation;         // 検出に使った追加回転(probe では常に 0)
+        public final EARDetectedFace face; // only when found
+        public final int rotation;         // extra rotation used for detection (always 0 for probe)
 
         Probe(boolean found, EARDetectedFace face, int rotation) {
             this.found = found;
@@ -55,7 +55,7 @@ public class SafrEngine {
         }
     }
 
-    /** register/match の結果 */
+    /** register/match result */
     public static class Result {
         public final boolean ok;
         public final double confidence;
@@ -78,7 +78,7 @@ public class SafrEngine {
         return registered;
     }
 
-    /** モデル展開 + native 初期化。数十秒かかるのでバックグラウンドで呼ぶこと */
+    /** Model extraction + native init. Takes tens of seconds, so call in the background */
     public synchronized boolean init(Context ctx) {
         if (initialized) {
             return true;
@@ -103,8 +103,8 @@ public class SafrEngine {
     }
 
     /**
-     * プレビュー用: 検出だけ行い、最大の顔の品質値を返す。
-     * 低頻度で連続して呼ぶ前提のため、多方向リトライはしない(0° のみ)。
+     * For preview: detect only and return the quality of the largest face.
+     * Meant to be called repeatedly at low rate, so no multi-orientation retry (0° only).
      */
     public synchronized Probe probe(Bitmap bmp) {
         if (!initialized) {
@@ -137,14 +137,14 @@ public class SafrEngine {
 
     private static final int[] RETRY_ROTATIONS = {0, 90, 270, 180};
 
-    /** 顔が検出できる向きの Bitmap を返す(見つからなければ null)。検出キャッシュはその向きになる */
+    /** Return the Bitmap in an orientation where a face is detected (null if none). The detection cache ends up in that orientation */
     private Bitmap orientForFace(Bitmap bmp) {
         for (int deg : RETRY_ROTATIONS) {
             Bitmap cand = (deg == 0) ? bmp : rotate(bmp, deg);
             ArrayList<FaceInfo> detected = esdk.detectFaces(cand, 5);
             if (!detected.isEmpty()) {
                 if (deg != 0) {
-                    Log.i(TAG, "顔を追加回転 " + deg + "° で検出");
+                    Log.i(TAG, "Face detected with extra rotation " + deg + "°");
                 }
                 return cand;
             }
@@ -158,50 +158,50 @@ public class SafrEngine {
         return Bitmap.createBitmap(src, 0, 0, src.getWidth(), src.getHeight(), m, true);
     }
 
-    /** 登録。ストアをクリアしてから 1 件登録する(常に最後の 1 人だけ) */
+    /** Register. Clears the store and then registers one entry (always only the last person) */
     public synchronized Result register(Bitmap bmp) {
         if (!initialized) {
-            return new Result(false, 0, 0, "未初期化");
+            return new Result(false, 0, 0, "Not initialized");
         }
         try {
             Bitmap oriented = orientForFace(bmp);
             if (oriented == null) {
-                return new Result(false, 0, 0, "顔を検出できませんでした");
+                return new Result(false, 0, 0, "No face detected");
             }
             esdk.clearPersonStore();
             registered = false;
             ArrayList<FaceInfo> learned = esdk.learnPerson(oriented, 5);
             if (learned.isEmpty()) {
-                return new Result(false, 0, 0, "顔の登録に失敗しました");
+                return new Result(false, 0, 0, "Failed to register face");
             }
             registered = true;
             float mask = learned.get(0).detectedFace.mask;
-            return new Result(true, 0, mask, "登録しました");
+            return new Result(true, 0, mask, "Registered");
         } catch (Throwable t) {
             Log.e(TAG, "register failed", t);
-            return new Result(false, 0, 0, "登録エラー: " + t.getMessage());
+            return new Result(false, 0, 0, "Registration error: " + t.getMessage());
         }
     }
 
-    /** 照合。confidence(類似度。1.0 超あり)を返す */
+    /** Match. Returns confidence (similarity; may exceed 1.0) */
     public synchronized Result match(Bitmap bmp) {
         if (!initialized) {
-            return new Result(false, 0, 0, "未初期化");
+            return new Result(false, 0, 0, "Not initialized");
         }
         try {
             Bitmap oriented = orientForFace(bmp);
             if (oriented == null) {
-                return new Result(false, 0, 0, "顔を検出できませんでした");
+                return new Result(false, 0, 0, "No face detected");
             }
             ArrayList<FaceInfo> recognized = esdk.recognizePerson(oriented, 5);
             if (recognized.isEmpty()) {
-                return new Result(false, 0, 0, "照合できませんでした(登録済みの顔がない可能性)");
+                return new Result(false, 0, 0, "No match (possibly no registered face)");
             }
             EARDetectedFace f = recognized.get(0).detectedFace;
-            return new Result(true, f.confidence, f.mask, "照合しました");
+            return new Result(true, f.confidence, f.mask, "Matched");
         } catch (Throwable t) {
             Log.e(TAG, "match failed", t);
-            return new Result(false, 0, 0, "照合エラー: " + t.getMessage());
+            return new Result(false, 0, 0, "Match error: " + t.getMessage());
         }
     }
 
@@ -215,12 +215,12 @@ public class SafrEngine {
         }
     }
 
-    // ------------------------------------------------------------- モデル展開
+    // ------------------------------------------------------- model extraction
 
     /**
-     * assets/ESDKModels.zip を filesDir 直下に展開し、filesDir/ESDKModels を返す。
-     * zip は中身が "ESDKModels/xxx" 形式なので展開先は filesDir ルート
-     * (ESDKModels/ に展開すると二重になり initESDK が rc=12 で失敗する)。
+     * Extract assets/ESDKModels.zip directly into filesDir and return filesDir/ESDKModels.
+     * The zip entries are "ESDKModels/xxx", so extract to the filesDir root
+     * (extracting into ESDKModels/ nests it twice and initESDK fails with rc=12).
      */
     private String prepareModels(Context ctx) throws Exception {
         File root = ctx.getFilesDir();
@@ -235,9 +235,9 @@ public class SafrEngine {
             ZipEntry e;
             while ((e = zin.getNextEntry()) != null) {
                 File out = new File(root, e.getName());
-                // Zip Slip 対策
+                // Zip Slip protection
                 if (!out.getCanonicalPath().startsWith(root.getCanonicalPath() + File.separator)) {
-                    throw new SecurityException("不正なzipエントリ: " + e.getName());
+                    throw new SecurityException("Invalid zip entry: " + e.getName());
                 }
                 if (e.isDirectory()) {
                     out.mkdirs();

@@ -4,30 +4,30 @@ import { getFaucetHost, requestSuiFromFaucetV2 } from "@mysten/sui/faucet";
 import { Transaction } from "@mysten/sui/transactions";
 
 /**
- * Sui ウォレット(IDi シードの Account Abstraction ウォレット)。
+ * Sui wallet (Account Abstraction wallet seeded by the IDi).
  *
- * ウォレットは IDi から決定的に導出する。同じ IDi は必ず同じ Sui アドレスに
- * なるため、チャージ経路のルータが「IDi → ウォレットアドレス」を解決できる。
- * IDi は秘密ではなく公開のアカウント識別子(口座番号に相当)として扱う。
+ * The wallet is derived deterministically from the IDi. The same IDi always maps to
+ * the same Sui address, so the top-up router can resolve "IDi -> wallet address".
+ * The IDi is treated not as a secret but as a public account identifier (like an account number).
  *
- * ⚠ 決定的導出なので、カードを読めば誰でも同じ鍵を再現できる。したがって
- * 資金の保護はこの鍵の秘匿ではなく、アンロック時の「IDi + 顔の ZKP 証明」
- * (顔 ZKP は Hi-CARA ローカルのみ)= オンチェーンの ZKP ゲートが担う。
- * ここで作るのは、その口座アドレスを決めるための決定的ウォレット。
+ * ⚠ Because derivation is deterministic, anyone who reads the card can reproduce the key.
+ * Funds are therefore protected not by keeping this key secret but by the "IDi + face ZK proof"
+ * at unlock time (face ZKP is local to Hi-CARA only) = the on-chain ZKP gate.
+ * What we create here is a deterministic wallet that fixes that account address.
  *
- * ネットワークは Sui testnet。チャージは testnet faucet を使う。
+ * Network is Sui testnet. Top-ups use the testnet faucet.
  *
- * エンドポイントは差し替え可能(公開エンドポイントは 429 レート制限が出やすい):
+ * Endpoints are overridable (public endpoints often hit 429 rate limits):
  *   - fullnode RPC : ?rpc=<url> / localStorage suicash.rpc / VITE_SUI_RPC
  *   - faucet       : ?faucet=<url> / localStorage suicash.faucet / VITE_SUI_FAUCET
  */
 
 const NETWORK = "testnet" as const;
 
-/** ドメイン分離タグ(用途違いで同じ IDi から別鍵が出ないように) */
+/** Domain separation tag (so other uses of the same IDi yield different keys) */
 const SEED_DOMAIN = "suicash-aa-wallet:v1:";
 
-/** 設定値を URL クエリ → localStorage → ビルド時 env → 既定 の順で解決 */
+/** Resolve a setting from URL query -> localStorage -> build-time env -> default */
 function setting(key: string, envKey: string, fallback: string): string {
   try {
     const q = new URLSearchParams(window.location.search).get(key);
@@ -38,7 +38,7 @@ function setting(key: string, envKey: string, fallback: string): string {
     const stored = localStorage.getItem(`suicash.${key}`);
     if (stored) return stored;
   } catch {
-    // localStorage 不可でも続行
+    // Continue even if localStorage is unavailable
   }
   const env = (import.meta.env as Record<string, string | undefined>)[envKey];
   return env || fallback;
@@ -48,14 +48,14 @@ const RPC_URL = setting("rpc", "VITE_SUI_RPC", getFullnodeUrl(NETWORK));
 const FAUCET_URL = setting("faucet", "VITE_SUI_FAUCET", getFaucetHost(NETWORK));
 
 /**
- * トレジャリー秘密鍵(任意)。設定されていれば faucet を使わず、この
- * 事前入金済みアカウントから送金する(公開 faucet の 429 を完全回避)。
- * 形式は `suiprivkey1...`(sui keytool の bech32)。testnet 専用・デモ用途。
- * 値はリポジトリに入れず、実行時に URL/localStorage/env で注入する。
+ * Treasury secret key (optional). If set, transfers come from this pre-funded
+ * account instead of the faucet (fully avoiding the public faucet's 429s).
+ * Format is `suiprivkey1...` (sui keytool bech32). Testnet only, for demos.
+ * Never commit the value; inject it at runtime via URL/localStorage/env.
  */
 const TREASURY_SECRET = setting("treasury", "VITE_TREASURY_SECRET", "");
 
-/** 1 回のチャージ額(MIST)。既定 0.2 SUI */
+/** Amount per top-up (MIST). Default 0.2 SUI */
 const CHARGE_MIST = 200_000_000n;
 
 export const client = new SuiClient({ url: RPC_URL });
@@ -64,7 +64,7 @@ export function hasTreasury(): boolean {
   return TREASURY_SECRET.trim().length > 0;
 }
 
-/** IDi(16 hex 文字)→ 32 バイトのシード(SHA-256(domain || idiBytes)) */
+/** IDi (16 hex chars) -> 32-byte seed (SHA-256(domain || idiBytes)) */
 async function seedFromIdi(idiHex: string): Promise<Uint8Array> {
   const idiBytes = hexToBytes(idiHex);
   const domain = new TextEncoder().encode(SEED_DOMAIN);
@@ -75,7 +75,7 @@ async function seedFromIdi(idiHex: string): Promise<Uint8Array> {
   return new Uint8Array(digest); // 32 bytes
 }
 
-/** IDi から決定的に AA ウォレット鍵を導出する */
+/** Deterministically derive the AA wallet key from the IDi */
 export async function deriveWallet(idiHex: string): Promise<Ed25519Keypair> {
   const seed = await seedFromIdi(idiHex);
   return Ed25519Keypair.fromSecretKey(seed);
@@ -85,7 +85,7 @@ export function walletAddress(kp: Ed25519Keypair): string {
   return kp.getPublicKey().toSuiAddress();
 }
 
-/** IDi から決定的にウォレットアドレスを解決する(ルータ相当) */
+/** Deterministically resolve the wallet address from the IDi (router equivalent) */
 export async function resolveAddress(idiHex: string): Promise<string> {
   return walletAddress(await deriveWallet(idiHex));
 }
@@ -99,7 +99,7 @@ function hexToBytes(h: string): Uint8Array {
   return out;
 }
 
-/** 残高(SUI 単位の文字列)。取得失敗時は null */
+/** Balance (string in SUI). null on failure */
 export async function fetchBalance(address: string): Promise<string | null> {
   try {
     const b = await client.getBalance({ owner: address });
@@ -114,16 +114,16 @@ export async function fetchBalance(address: string): Promise<string | null> {
 
 export interface ChargeResult {
   ok: boolean;
-  /** ユーザー向けメッセージ */
+  /** User-facing message */
   message: string;
-  /** 429 等でのクールダウン秒数(分かれば) */
+  /** Cooldown seconds after a 429 etc. (if known) */
   retryAfterSec?: number;
 }
 
 /**
- * チャージ。
- * トレジャリー鍵が設定されていればそこから送金(faucet を使わず 429 回避)。
- * 未設定なら公開 testnet faucet にフォールバック(429 が出やすい)。
+ * Top up.
+ * If a treasury key is set, transfer from it (skipping the faucet to avoid 429s).
+ * Otherwise fall back to the public testnet faucet (prone to 429s).
  */
 export async function requestCharge(address: string): Promise<ChargeResult> {
   if (hasTreasury()) {
@@ -131,23 +131,23 @@ export async function requestCharge(address: string): Promise<ChargeResult> {
   }
   try {
     await requestSuiFromFaucetV2({ host: FAUCET_URL, recipient: address });
-    return { ok: true, message: "チャージしました(testnet faucet)" };
+    return { ok: true, message: "Topped up (testnet faucet)" };
   } catch (e) {
     const status = extractStatus(e);
     if (status === 429) {
       return {
         ok: false,
         message:
-          "faucet が混雑しています(レート制限)。トレジャリー鍵を設定すると 429 を回避できます(README 参照)。",
+          "The faucet is busy (rate limited). Set a treasury key to avoid 429s (see README).",
         retryAfterSec: 60,
       };
     }
     const detail = e instanceof Error ? e.message : String(e);
-    return { ok: false, message: `チャージに失敗しました: ${detail}` };
+    return { ok: false, message: `Top-up failed: ${detail}` };
   }
 }
 
-/** トレジャリー(事前入金済みアカウント)から CHARGE_MIST を送金する */
+/** Transfer CHARGE_MIST from the treasury (pre-funded account) */
 async function chargeFromTreasury(address: string): Promise<ChargeResult> {
   try {
     const treasury = Ed25519Keypair.fromSecretKey(TREASURY_SECRET.trim());
@@ -161,19 +161,19 @@ async function chargeFromTreasury(address: string): Promise<ChargeResult> {
     });
     const status = res.effects?.status?.status;
     if (status !== "success") {
-      return { ok: false, message: `送金が失敗しました: ${res.effects?.status?.error ?? status}` };
+      return { ok: false, message: `Transfer failed: ${res.effects?.status?.error ?? status}` };
     }
-    return { ok: true, message: `チャージしました(${Number(CHARGE_MIST) / 1e9} SUI)` };
+    return { ok: true, message: `Topped up (${Number(CHARGE_MIST) / 1e9} SUI)` };
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     if (/insufficient|gas|balance/i.test(detail)) {
-      return { ok: false, message: "トレジャリーの残高が不足しています。testnet SUI を補充してください。" };
+      return { ok: false, message: "Treasury balance is insufficient. Please refill it with testnet SUI." };
     }
-    return { ok: false, message: `チャージに失敗しました: ${detail}` };
+    return { ok: false, message: `Top-up failed: ${detail}` };
   }
 }
 
-/** トレジャリーのアドレス(補充用に表示)。未設定なら null */
+/** Treasury address (shown for refilling). null if not set */
 export function treasuryAddress(): string | null {
   if (!hasTreasury()) return null;
   try {
@@ -183,7 +183,7 @@ export function treasuryAddress(): string | null {
   }
 }
 
-/** 例外オブジェクトから HTTP ステータスらしき数値を拾う */
+/** Pick out something that looks like an HTTP status from an exception */
 function extractStatus(e: unknown): number | undefined {
   if (typeof e === "object" && e !== null) {
     const anyE = e as Record<string, unknown>;

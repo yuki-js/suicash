@@ -9,21 +9,21 @@ interface Props {
 }
 
 /**
- * 決済結果を自動改札の LCD 風に表示する。
- * 上段に処理種別、中央に引き去り額(大)、右下に残額 —— 交通系改札の表示を踏襲。
+ * Shows the payment result like a ticket gate LCD.
+ * Transaction type on top, deducted amount (large) in the middle, balance at bottom right, following transit gate displays.
  */
 export function GateLcd({ ok, amount, balanceAfter, error, onDone }: Props) {
   return (
     <div className={`lcd ${ok ? "lcd--ok" : "lcd--ng"}`} onClick={onDone}>
       <div className="lcd__panel">
         <div className="lcd__top">
-          <span className="lcd__kind">{ok ? "支払い" : "エラー"}</span>
+          <span className="lcd__kind">{ok ? "Payment" : "Error"}</span>
           <span className="lcd__mark">{ok ? "○" : "×"}</span>
         </div>
 
         {ok ? (
           <div className="lcd__mid">
-            <span className="lcd__amountLabel">引去</span>
+            <span className="lcd__amountLabel">Paid</span>
             <span className="lcd__amount">
               {mistToSui(amount)}
               <span className="lcd__unit">SUI</span>
@@ -31,19 +31,19 @@ export function GateLcd({ ok, amount, balanceAfter, error, onDone }: Props) {
           </div>
         ) : (
           <div className="lcd__mid lcd__mid--error">
-            <span className="lcd__errText">{error || "処理できませんでした"}</span>
+            <span className="lcd__errText">{error || "Could not process"}</span>
           </div>
         )}
 
         <div className="lcd__bottom">
-          <span className="lcd__balLabel">残額</span>
+          <span className="lcd__balLabel">Balance</span>
           <span className="lcd__bal">
             {mistToSui(balanceAfter)}
             <span className="lcd__unit lcd__unit--sm">SUI</span>
           </span>
         </div>
       </div>
-      <p className="lcd__hint">画面をタッチで戻る</p>
+      <p className="lcd__hint">Tap the screen to go back</p>
     </div>
   );
 }

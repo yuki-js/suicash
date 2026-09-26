@@ -27,30 +27,30 @@ import org.json.JSONObject;
 import jp.co.nextware.frcardreader.safr.EARDetectedFace;
 
 /**
- * face-auth-ui (React) を全画面表示する WebView シェル。
+ * WebView shell that shows face-auth-ui (React) full screen.
  *
- * - 顔認証エンジン(SAFR eSDK)を同プロセスで初期化し JS ブリッジで公開
- * - カメラはネイティブ(Camera2 → TextureView)が所有し、プレビュー JPEG を
- *   低 fps で JS に push(window.__safrFrame)。WebView の getUserMedia は
- *   この端末の HAL とかみ合わないため使わない
- * - probe / register / match はネイティブが現在フレームを直接取るので、
- *   JS からの画像転送は無い
+ * - Initializes the face-recognition engine (SAFR eSDK) in-process and exposes it via a JS bridge
+ * - The camera is owned natively (Camera2 → TextureView); preview JPEGs are
+ *   pushed to JS at low fps (window.__safrFrame). WebView getUserMedia is
+ *   not used because it doesn't work with this device's HAL
+ * - probe / register / match grab the current frame natively,
+ *   so no images are sent from JS
  *
- * ブリッジ:
+ * Bridge:
  *   JS  → Java : SafrNative.request(id, method, payload)
  *                (status / probe / register / match / clearStore /
  *                 cameraStart / cameraStop)
  *   Java → JS  : window.__safrResolve(id, resultJson)
- *   Java → JS  : window.__safrFrame(dataUrl)   … プレビューフレーム push
+ *   Java → JS  : window.__safrFrame(dataUrl)   … preview frame push
  *
- * URL は intent data で差し替え可能(singleTask + onNewIntent なので
- * 母艦 CLI から am start -d <url> で画面・モードを切り替えられる)。
+ * The URL can be overridden via intent data (with singleTask + onNewIntent,
+ * the host CLI can switch screen/mode with am start -d <url>).
  */
 public class MainActivity extends Activity {
 
     private static final String TAG = "SuiCashUI";
     private static final String DEFAULT_URL = "http://localhost:5173/?debug=1";
-    private static final int PREVIEW_INTERVAL_MS = 250; // 約4fps
+    private static final int PREVIEW_INTERVAL_MS = 250; // ~4fps
     private static final int PREVIEW_WIDTH = 320;
     private static final int PROBE_WIDTH = 640;
     private static final int CAPTURE_WIDTH = 960;
@@ -58,13 +58,13 @@ public class MainActivity extends Activity {
     private WebView web;
     private CameraHost cameraHost;
     private final SafrEngine engine = new SafrEngine();
-    /** 上部 RGB LED(SmartETK GPIO) */
+    /** Top RGB LED (SmartETK GPIO) */
     private final LedController led = new LedController();
-    /** エンジン呼び出しは単一スレッドで直列化する */
+    /** Engine calls are serialized on a single thread */
     private final ExecutorService engineExec = Executors.newSingleThreadExecutor();
-    /** LED は SAFR と別スレッド(GPIO の遅延が SAFR を止めないように) */
+    /** LED runs on a separate thread from SAFR (so GPIO latency doesn't block SAFR) */
     private final ExecutorService ledExec = Executors.newSingleThreadExecutor();
-    /** プレビュー push はエンジンと独立に回す */
+    /** Preview push runs independently of the engine */
     private final ExecutorService previewExec = Executors.newSingleThreadExecutor();
     private volatile boolean previewOn = false;
 
@@ -76,12 +76,12 @@ public class MainActivity extends Activity {
             requestPermissions(new String[] { Manifest.permission.CAMERA }, 1);
         }
 
-        // エンジン初期化(初回はモデル展開込みで数十秒)
+        // Engine init (first run takes tens of seconds including model extraction)
         engineExec.execute(() -> {
             boolean ok = engine.init(getApplicationContext());
             Log.i(TAG, "SafrEngine init " + (ok ? "OK" : "FAILED"));
         });
-        // LED 初期化(GPIO サービスが無ければ無効で続行)
+        // LED init (continues disabled if there's no GPIO service)
         ledExec.execute(led::init);
 
         FrameLayout root = new FrameLayout(this);
@@ -113,7 +113,7 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        load(intent); // 母艦 CLI からの再 start でモード切替
+        load(intent); // mode switch on re-start from the host CLI
     }
 
     private void load(Intent intent) {
@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    /** WebView から LED を制御する JS ブリッジ: window.LedNative.set("blue_blink"|"green"|"red"|"off") */
+    /** JS bridge for controlling the LED from the WebView: window.LedNative.set("blue_blink"|"green"|"red"|"off") */
     private class LedBridge {
         @android.webkit.JavascriptInterface
         public void set(final String mode) {
@@ -151,7 +151,7 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ---------------------------------------------------------- プレビュー push
+    // ------------------------------------------------------------ preview push
 
     private void startPreview() {
         if (previewOn) {
@@ -197,13 +197,13 @@ public class MainActivity extends Activity {
         }
     }
 
-    // ------------------------------------------------------------- JS ブリッジ
+    // --------------------------------------------------------------- JS bridge
 
     private class SafrBridge {
 
         @JavascriptInterface
         public void request(final String id, final String method, final String payload) {
-            // カメラ制御はエンジン処理と独立に即時実行する
+            // Camera control runs immediately, independent of engine work
             if ("cameraStart".equals(method) || "cameraStop".equals(method)) {
                 if ("cameraStart".equals(method)) {
                     startPreview();
@@ -269,7 +269,7 @@ public class MainActivity extends Activity {
                     SafrEngine.Result r = (bmp == null) ? null : engine.register(bmp);
                     JSONObject o = new JSONObject();
                     o.put("ok", r != null && r.ok);
-                    o.put("message", r == null ? "フレームを取得できませんでした" : r.message);
+                    o.put("message", r == null ? "Could not capture a frame" : r.message);
                     if (r != null) {
                         o.put("mask", r.mask);
                     }
@@ -280,7 +280,7 @@ public class MainActivity extends Activity {
                     SafrEngine.Result r = (bmp == null) ? null : engine.match(bmp);
                     JSONObject o = new JSONObject();
                     o.put("ok", r != null && r.ok);
-                    o.put("message", r == null ? "フレームを取得できませんでした" : r.message);
+                    o.put("message", r == null ? "Could not capture a frame" : r.message);
                     if (r != null) {
                         o.put("confidence", r.confidence);
                         o.put("mask", r.mask);

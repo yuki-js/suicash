@@ -11,19 +11,19 @@ import { DEFAULT_THRESHOLD } from "./sim";
 import { subscribe, report, setLed, type LedMode, type TerminalEvent } from "./terminal";
 
 /**
- * 決済端末(Hi-CARA)の UI 状態機械。
+ * UI state machine for the payment terminal (Hi-CARA).
  *
- * 母艦(PC)が FeliCa を読み、オラクルで IDi を認証し、オンチェーン決済まで担う。
- * 端末は母艦からのイベント(card / mode / paymentResult)で画面を切り替える:
+ * The host (PC) reads FeliCa, authenticates the IDi via the oracle, and handles on-chain payment.
+ * The terminal switches screens on host events (card / mode / paymentResult):
  *
- *   waiting(カード待ち)
- *     └ card → 未登録: registerPrompt
- *             登録済み & 端末に顔なし: enroll(顔登録)→ 認証済み扱いで次へ
- *             登録済み & 顔あり:       auth(顔認証)
- *        └ 顔OK → 待機モード: balance(残高照会) / 決済モード: paying → gateLcd
+ *   waiting (waiting for card)
+ *     └ card → unregistered: registerPrompt
+ *             registered & no face on terminal: enroll (face registration) → proceed as authenticated
+ *             registered & face on terminal:    auth (face auth)
+ *        └ face OK → idle mode: balance (balance inquiry) / payment mode: paying → gateLcd
  *
- * 顔は端末内に保持(IDi キー、セッション内)。実際の顔照合は端末内で完結し、
- * 顔データは端末の外へ出ない(ZKP はローカルのみ)。
+ * Faces are kept on the terminal (keyed by IDi, per session). Face matching happens entirely
+ * on the terminal and face data never leaves it (ZKP is local only).
  */
 
 type Card = { idi: string; registered: boolean; balance: string };
@@ -50,15 +50,15 @@ export default function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [logOpen, setLogOpen] = useState(false);
 
-  /** 端末内に顔を登録済みの IDi(セッション内)。SAFR ストアは1名なので直近1件を追跡 */
+  /** IDi whose face is enrolled on the terminal (per session). The SAFR store holds one person, so track the latest one */
   const enrolledIdi = useRef<string | null>(null);
 
   const log = useCallback((text: string) => {
-    const time = new Date().toLocaleTimeString("ja-JP", { hour12: false });
+    const time = new Date().toLocaleTimeString("en-US", { hour12: false });
     setLogs((prev) => [...prev.slice(-199), { time, text }]);
   }, []);
 
-  // エンジン初期化待ち(SAFR は数十秒)
+  // Wait for engine init (SAFR takes tens of seconds)
   useEffect(() => {
     log(`engine: ${engine.kind}`);
     let stop = false;
@@ -80,44 +80,44 @@ export default function App() {
     setLcd(null);
   }, []);
 
-  // 画面遷移に応じて上部 LED を制御
+  // Drive the top LED according to screen transitions
   useEffect(() => {
     let mode: LedMode;
     switch (screen) {
       case "detecting":
       case "enroll":
       case "auth":
-        mode = "blue_blink"; // 認証中は青点滅
+        mode = "blue_blink"; // blink blue while authenticating
         break;
       case "balance":
-        mode = "green"; // 本人確認OK
+        mode = "green"; // identity verified
         break;
       case "registerPrompt":
-        mode = "red"; // 未登録
+        mode = "red"; // unregistered
         break;
       case "lcd":
-        mode = lcd?.ok ? "green" : "red"; // 決済成功=緑 / 失敗(残高なし等)=赤
+        mode = lcd?.ok ? "green" : "red"; // payment success = green / failure (insufficient balance etc.) = red
         break;
       case "paying":
         mode = "blue_blink";
         break;
       default:
-        mode = "off"; // 待機
+        mode = "off"; // idle
     }
     setLed(mode);
   }, [screen, lcd]);
 
-  // 母艦イベントの購読
+  // Subscribe to host events
   useEffect(() => {
     return subscribe((e: TerminalEvent) => {
       switch (e.type) {
         case "detecting":
-          // カード検出の即時反応(認証はこの後)。既に処理中の画面なら維持
+          // Immediate reaction to card detection (auth follows). Keep the screen if already processing
           setScreen((s) => (s === "waiting" ? "detecting" : s));
           break;
         case "mode":
           setPayMode(e.payment);
-          log(`母艦: ${e.payment ? `決済待機 ${e.payment.amount} MIST` : "残高照会モード"}`);
+          log(`Host: ${e.payment ? `awaiting payment ${e.payment.amount} MIST` : "balance inquiry mode"}`);
           break;
         case "card": {
           log(`card idi=${e.idi} registered=${e.registered} bal=${e.balance}`);
@@ -126,7 +126,7 @@ export default function App() {
           if (!c.registered) {
             setScreen("registerPrompt");
           } else if (enrolledIdi.current !== c.idi) {
-            setScreen("enroll"); // オンチェーン登録あり + 端末に顔なし → 顔登録
+            setScreen("enroll"); // registered on-chain + no face on terminal → enroll face
           } else {
             setScreen("auth");
           }
@@ -145,14 +145,14 @@ export default function App() {
     });
   }, [log, goWaiting]);
 
-  // 顔OK後の分岐: 待機=残高照会 / 決済=送金依頼
+  // After face OK: idle = balance inquiry / payment = request transfer
   const onFaceResult = useCallback(
     (ok: boolean, _conf: number | null, mode: "enroll" | "auth") => {
       if (!card) return;
       if (!ok) {
         report({ type: "faceNg", idi: card.idi });
-        log("顔認証NG");
-        // NG は待機へ戻す(実運用はリトライ導線でもよい)
+        log("Face auth failed");
+        // On failure return to idle (a retry flow would also work in production)
         goWaiting();
         return;
       }
@@ -162,10 +162,10 @@ export default function App() {
       }
       report({ type: "faceOk", idi: card.idi });
       if (payMode) {
-        // 母艦が送金を実行 → paymentResult を待つ
+        // Host executes the transfer → wait for paymentResult
         setScreen("paying");
       } else {
-        setScreen("balance"); // 待機モード: 残高照会のみ
+        setScreen("balance"); // idle mode: balance inquiry only
       }
     },
     [card, payMode, log, goWaiting],
@@ -175,8 +175,8 @@ export default function App() {
     <div className="app app--terminal">
       <header className="app__header">
         <Logo inverted />
-        <span className="app__headerTag">決済端末</span>
-        {!engineReady && <span className="app__badge app__badge--enroll">エンジン初期化中</span>}
+        <span className="app__headerTag">Payment Terminal</span>
+        {!engineReady && <span className="app__badge app__badge--enroll">Engine starting…</span>}
       </header>
 
       <main className="app__main">
@@ -185,7 +185,7 @@ export default function App() {
         {screen === "detecting" && (
           <div className="processing">
             <div className="processing__spinner" />
-            <p>カードを認証しています…</p>
+            <p>Authenticating card…</p>
           </div>
         )}
 
@@ -226,7 +226,7 @@ export default function App() {
         {screen === "paying" && (
           <div className="processing">
             <div className="processing__spinner" />
-            <p>決済しています…</p>
+            <p>Processing payment…</p>
           </div>
         )}
 
@@ -245,32 +245,32 @@ export default function App() {
       {DEBUG && <LogPanel entries={logs} open={logOpen} onToggle={() => setLogOpen((o) => !o)} />}
 
       <footer className="app__footer">
-        SuiCash 決済端末 — engine: {engine.kind}
-        {engine.kind === "mock" ? "(実エンジン未接続)" : ""}
+        SuiCash Payment Terminal — engine: {engine.kind}
+        {engine.kind === "mock" ? " (real engine not connected)" : ""}
       </footer>
     </div>
   );
 }
 
-/** ?debug=1 のときだけ出る、母艦イベントを手で流すデバッグパネル(ブラウザ検証用) */
+/** Debug panel, shown only with ?debug=1, for manually emitting host events (browser testing) */
 function DebugPanel() {
   const emit = (event: TerminalEvent) =>
     window.postMessage({ source: "suicash-facepay", event }, "*");
   const demoIdi = "05d5807e28260205";
   return (
     <div className="debugPanel">
-      <span className="debugPanel__label">DEBUG 母艦シミュレータ</span>
+      <span className="debugPanel__label">DEBUG Host Simulator</span>
       <div className="debugPanel__row">
-        <button onClick={() => emit({ type: "mode", payment: null })}>残高照会モード</button>
-        <button onClick={() => emit({ type: "mode", payment: { amount: "300000000" } })}>決済待機 0.3</button>
+        <button onClick={() => emit({ type: "mode", payment: null })}>Balance mode</button>
+        <button onClick={() => emit({ type: "mode", payment: { amount: "300000000" } })}>Payment 0.3</button>
       </div>
       <div className="debugPanel__row">
-        <button onClick={() => emit({ type: "card", idi: demoIdi, registered: true, balance: "1000000000" })}>登録済みカード</button>
-        <button onClick={() => emit({ type: "card", idi: "ffffffffffffffff", registered: false, balance: "0" })}>未登録カード</button>
+        <button onClick={() => emit({ type: "card", idi: demoIdi, registered: true, balance: "1000000000" })}>Registered card</button>
+        <button onClick={() => emit({ type: "card", idi: "ffffffffffffffff", registered: false, balance: "0" })}>Unregistered card</button>
       </div>
       <div className="debugPanel__row">
-        <button onClick={() => emit({ type: "paymentResult", ok: true, amount: "300000000", balanceAfter: "700000000", digest: "DEMO" })}>決済成功</button>
-        <button onClick={() => emit({ type: "cardRemoved" })}>カード離す</button>
+        <button onClick={() => emit({ type: "paymentResult", ok: true, amount: "300000000", balanceAfter: "700000000", digest: "DEMO" })}>Payment OK</button>
+        <button onClick={() => emit({ type: "cardRemoved" })}>Remove card</button>
       </div>
     </div>
   );

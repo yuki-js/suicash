@@ -1,145 +1,147 @@
-# SuiCash 登録サイト (regist-web)
+# SuiCash Registration Site (regist-web)
 
-利用者のスマホ向け登録フロントエンド。カード番号(IDi)の登録 →
-Sui ウォレット発行 → 顔認証の利用登録(ダミー)→ チャージ、までを行う。
-決済時の顔照合は店舗の認証端末(Hi-CARA、`face-auth-ui/`)の中だけで行われる。
+Registration frontend for users' smartphones. Covers registering the card number (IDi) →
+issuing a Sui wallet → enrolling in face authentication (dummy) → topping up.
+Face matching at payment happens only inside the store's auth terminal (Hi-CARA, `face-auth-ui/`).
 
 ```sh
 npm install
-npm run dev      # 開発サーバ
-npm run build    # 型チェック + 本番ビルド
+npm run dev      # dev server
+npm run build    # type check + production build
 ```
 
-## デプロイ
+## Deployment
 
-### 本番: GitHub Pages(自動デプロイ)
+### Production: GitHub Pages (auto-deploy)
 
-`face-regist` の `regist-web/**` に push すると、Actions
-(`.github/workflows/pages.yml`。`site/` の紹介ページと一緒に `/app/` として)がビルドして GitHub Pages に公開する。
-**HTTPS が自動で付く**ので、スマホの券面カメラ OCR(`getUserMedia` は
-secure context 必須)もそのまま動く。サーバー・Docker・SSH は不要。
+Pushing to `regist-web/**` on `face-regist` makes Actions
+(`.github/workflows/pages.yml`, published under `/app/` together with the `site/` landing page)
+build and publish to GitHub Pages.
+**HTTPS is provided automatically**, so card camera OCR on phones (`getUserMedia`
+requires a secure context) just works. No server, Docker, or SSH needed.
 
-- 公開 URL: **https://yuki-js.github.io/suicash/app/**(ルートは `site/` の紹介ページ。旧 URL に `?treasury=` 等を付けたリンクは `/app/` へ転送される)
-- 初回のみ GitHub 側で有効化: Settings → Pages → Build and deployment →
+- Public URL: **https://yuki-js.github.io/suicash/app/** (the root is the `site/` landing page;
+  old-URL links with `?treasury=` etc. are redirected to `/app/`)
+- One-time setup on GitHub: Settings → Pages → Build and deployment →
   **Source: GitHub Actions**
-- `face-regist`(デフォルトブランチ以外)から公開するため、環境
-  `github-pages` の保護ルールでこのブランチのデプロイが弾かれる場合は、
-  Settings → Environments → github-pages → Deployment branches に
-  `face-regist` を許可する(または main にマージ)
-- トレジャリー鍵 / RPC / faucet を埋め込むなら Settings → Secrets and
-  variables → Actions に `VITE_TREASURY_SECRET`(Secret)、
-  `VITE_SUI_RPC` / `VITE_SUI_FAUCET`(Variables)を設定
-- 相対パス出力(`base: "./"`)なのでサブパス `/suicash/` 配下で動く。
-  SPA フォールバック用に `404.html` と `.nojekyll` はワークフローが生成する
+- Since we publish from `face-regist` (not the default branch), if the
+  `github-pages` environment's protection rules reject deploys from this branch,
+  allow `face-regist` under Settings → Environments → github-pages → Deployment branches
+  (or merge into main)
+- To bake in the treasury key / RPC / faucet, set `VITE_TREASURY_SECRET` (Secret)
+  and `VITE_SUI_RPC` / `VITE_SUI_FAUCET` (Variables) under Settings → Secrets and
+  variables → Actions
+- Output uses relative paths (`base: "./"`), so it works under the `/suicash/` subpath.
+  The workflow generates `404.html` and `.nojekyll` for SPA fallback
 
-### ローカル確認
+### Local testing
 
 ```sh
-npm run dev        # 開発サーバ(HMR、:5173)
-npm run preview    # 本番ビルドの確認(:4173)
+npm run dev        # dev server (HMR, :5173)
+npm run preview    # preview the production build (:4173)
 ```
 
-> **カメラ読み取りの注意**: 券面 OCR は `getUserMedia` を使うため
-> **secure context(HTTPS または localhost)必須**。GitHub Pages は HTTPS
-> なので問題ない。ローカルは `http://localhost` なら可(LAN の IP 平文は不可)。
+> **Camera scanning note**: card OCR uses `getUserMedia`, so it
+> **requires a secure context (HTTPS or localhost)**. GitHub Pages is HTTPS,
+> so that's fine. Locally, `http://localhost` works (plain HTTP on a LAN IP does not).
 
-## 登録フロー
+## Registration flow
 
 ```mermaid
 flowchart TD
-    A["1. カード番号(IDi)登録<br/>KA + 英数字15文字(計17文字)<br/>手入力 or カメラ読み取り(券面OCR)"]
-    B["2. Sui ウォレット発行<br/>鍵は端末内で生成(IDi から導出しない)"]
-    C["3. 顔認証の利用登録(ダミー)<br/>顔データは収集しない"]
-    D["ダッシュボード<br/>残高表示・チャージ(testnet faucet)"]
+    A["1. Register card number (IDi)<br/>KA + 15 alphanumerics (17 total)<br/>Manual entry or camera scan (card OCR)"]
+    B["2. Issue Sui wallet<br/>Key generated on device (not derived from IDi)"]
+    C["3. Enroll in face authentication (dummy)<br/>No face data collected"]
+    D["Dashboard<br/>Balance, top-up (testnet faucet)"]
     A --> B --> C --> D
 ```
 
-## Sui エンドポイント(429 レート制限対策)
+## Sui endpoints (handling 429 rate limits)
 
-チャージや残高取得に使う公開 testnet エンドポイント(fullnode RPC / faucet)は
-共有 IP からのアクセスが集中すると **429(レート制限)** を返す。デモで安定させたい
-場合は、自前 or 別の RPC / faucet に差し替えられる(優先順:URL クエリ >
-localStorage > ビルド時 env > 既定):
+The public testnet endpoints (fullnode RPC / faucet) used for top-ups and balance
+queries return **429 (rate limited)** when traffic from a shared IP piles up. For a
+stable demo, you can swap in your own or another RPC / faucet (priority: URL query >
+localStorage > build-time env > default):
 
-| 対象 | URL クエリ | localStorage | ビルド時 env |
+| Target | URL query | localStorage | Build-time env |
 | --- | --- | --- | --- |
 | fullnode RPC | `?rpc=<url>` | `suicash.rpc` | `VITE_SUI_RPC` |
 | faucet | `?faucet=<url>` | `suicash.faucet` | `VITE_SUI_FAUCET` |
 
-例: `https://<host>/?rpc=https://your-node/....&faucet=https://your-faucet/...`
-(一度クエリで渡すと localStorage に保存され、次回以降は付けなくてよい)
+Example: `https://<host>/?rpc=https://your-node/....&faucet=https://your-faucet/...`
+(once passed via query it is saved to localStorage, so later visits don't need it)
 
-429 が出たときは UI 側でクールダウン(再試行まで N 秒)を表示する。faucet は
-同一アドレス・同一 IP への連続要求を制限するので、少し間隔をあけて試すこと。
+On a 429 the UI shows a cooldown ("Retry in N s"). The faucet throttles repeated
+requests to the same address / IP, so leave some time between attempts.
 
-### 429 を根本回避:トレジャリー送金(推奨)
+### Avoiding 429 entirely: treasury transfers (recommended)
 
-公開 faucet の 429 を完全に避けるには、**事前入金済みの testnet アカウント
-(トレジャリー)から送金**する。faucet を一切叩かないので 429 は出ない。
+To avoid the public faucet's 429s completely, **transfer from a pre-funded testnet
+account (the treasury)**. It never hits the faucet, so no 429s.
 
-1. トレジャリー鍵を作って testnet SUI を入れる:
+1. Create a treasury key and fund it with testnet SUI:
    ```sh
-   sui client new-address ed25519           # suiprivkey1... を控える
-   sui client switch --address <その address>
-   sui client faucet                         # 何度か。デモ人数ぶん貯める
-   sui keytool export --key-identity <address>   # suiprivkey1... を取得
+   sui client new-address ed25519           # note the suiprivkey1...
+   sui client switch --address <that address>
+   sui client faucet                         # a few times; stock enough for the demo audience
+   sui keytool export --key-identity <address>   # get the suiprivkey1...
    ```
-2. その `suiprivkey1...` を実行時に注入(**リポジトリには入れない**):
+2. Inject that `suiprivkey1...` at runtime (**never commit it to the repo**):
 
-   | 方法 | 指定 |
+   | Method | Setting |
    | --- | --- |
-   | URL クエリ | `?treasury=suiprivkey1...`(一度で localStorage に保存) |
-   | ビルド時 env | `VITE_TREASURY_SECRET=suiprivkey1...` |
+   | URL query | `?treasury=suiprivkey1...` (saved to localStorage after once) |
+   | Build-time env | `VITE_TREASURY_SECRET=suiprivkey1...` |
 
-3. 設定されていれば「チャージ」は自動でトレジャリー送金(1 回 0.2 SUI)に切り替わる。
-   未設定なら従来どおり faucet にフォールバック。
+3. When set, "Top up" automatically switches to treasury transfers (0.2 SUI each).
+   When unset, it falls back to the faucet as before.
 
-> testnet 専用・デモ用途。鍵はブラウザに載る(静的サイトのため)ので、
-> 価値のある鍵は使わないこと。残高が尽きたら `sui client faucet` で補充。
+> Testnet only, for demos. The key ends up in the browser (it's a static site), so
+> never use a key holding real value. Refill with `sui client faucet` when it runs dry.
 
-## プライバシー設計
+## Privacy design
 
-- **IDi(カード番号)は外部へ送らない**。外部(チェーン・IDi 検証サーバー)に
-  渡すのは `hash(IDi, salt)` のコミットメントのみ。生の IDi と salt は
-  この端末の localStorage にだけ保存する
-  (コミットメント方式は暫定 SHA-256。検証サーバー側の ZKP 回路が
-  決まり次第 Poseidon 等へ差し替える — `src/lib/idi.ts`)
-- **顔データは収集しない**。ステップ 3 はプライバシー保護のための
-  意図的なダミー登録(カメラも起動しない)。実際の顔照合は決済時に
-  認証端末の内部だけで行われ、そこでも顔データは端末外へ出ない
-- **鍵は IDi から導出しない**。IDi はリーダーで誰でも読める値のため、
-  ウォレット鍵はランダム生成し、IDi(コミットメント)→ウォレットの
-  対応付けはルータ/検証サーバー(別担当)がチェーン上で解決する設計
-- 券面 OCR の撮影画像もブラウザ内でのみ処理し、外部送信しない
+- **The IDi (card number) is never sent externally**. Only the `hash(IDi, salt)`
+  commitment goes to external parties (chain, IDi verification server). The raw IDi
+  and salt are stored only in this device's localStorage
+  (the commitment scheme is provisionally SHA-256; it will be swapped for Poseidon etc.
+  once the verification server's ZKP circuit is settled — `src/lib/idi.ts`)
+- **No face data is collected**. Step 3 is an intentional dummy enrollment for
+  privacy (the camera isn't even started). Real face matching happens only inside the
+  auth terminal at payment time, and even there face data never leaves the terminal
+- **Keys are not derived from the IDi**. Since anyone with a reader can read the IDi,
+  the wallet key is randomly generated, and the IDi (commitment) → wallet mapping is
+  resolved on-chain by the router / verification server (separate owner)
+- Card OCR images are also processed only in the browser and never sent externally
 
-## 券面 OCR(カメラ読み取り)
+## Card OCR (camera scanning)
 
-認証端末(Hi-CARA)で実績のある読み方を Web(canvas + Tesseract.js)に移植:
+A port of the approach proven on the auth terminal (Hi-CARA) to the web (canvas + Tesseract.js):
 
-1. カードガイド枠(「券面を枠の中に合わせてください」)に合わせて撮影
-2. 枠に対する固定位置(`ID_ROI`)で ID 行だけを切り出し
-3. 適応二値化 + 白抜き印字の自動反転で「白地×黒文字」に正規化
-4. 英数字ホワイトリストで 1 行 OCR → 英字→数字の見間違い補正 → 17 文字整形
-5. **結果は入力欄にプリフィルし、必ず利用者が確認・修正して確定**
+1. Capture with the card aligned to the guide frame ("Align the back of the card within the frame")
+2. Crop only the ID line at a fixed position relative to the frame (`ID_ROI`)
+3. Normalize to black-on-white via adaptive binarization + auto-inversion of white-on-dark print
+4. Single-line OCR with an alphanumeric whitelist → fix letter/digit misreads → shape to 17 chars
+5. **Prefill the result into the input; the user always checks, corrects, and confirms it**
 
-ROI・ガイド枠の位置は `src/lib/ocr.ts`(計算)と `src/styles.css` の
-`.scan__guide` / `.scan__idbox`(表示)で一致させてある。ズレたら両方直すこと。
+The ROI / guide frame positions are kept in sync between `src/lib/ocr.ts` (math) and
+`.scan__guide` / `.scan__idbox` in `src/styles.css` (display). If they drift, fix both.
 
-## ディレクトリ
+## Directory layout
 
 ```
 src/
-  App.tsx                 ステップ進行(IDi → ウォレット → 顔 → ダッシュボード)
+  App.tsx                 step flow (IDi → wallet → face → dashboard)
   lib/
-    idi.ts                IDi の検証・整形・コミットメント計算
-    ocr.ts                券面 OCR(前処理 + Tesseract.js + 整形)
-    wallet.ts             Sui ウォレット(testnet)・残高・faucet チャージ
-    storage.ts            登録状態の localStorage 永続化
+    idi.ts                IDi validation, formatting, commitment
+    ocr.ts                card OCR (preprocessing + Tesseract.js + cleanup)
+    wallet.ts             Sui wallet (testnet), balance, faucet top-up
+    storage.ts            localStorage persistence of registration state
   components/
-    IdiStep.tsx           IDi 登録(手入力 + カメラ読み取り)
-    WalletStep.tsx        ウォレット発行
-    FaceStep.tsx          顔認証の利用登録(ダミー・非収集)
-    Dashboard.tsx         残高・チャージ・登録情報
-    Logo.tsx              SuiCash ワードマーク
-Dockerfile / nginx.conf   ポート 1919 で配信
+    IdiStep.tsx           IDi registration (manual entry + camera scan)
+    WalletStep.tsx        wallet issuance
+    FaceStep.tsx          face authentication enrollment (dummy, no collection)
+    Dashboard.tsx         balance, top-up, registration info
+    Logo.tsx              SuiCash wordmark
+Dockerfile / nginx.conf   serves on port 1919
 ```

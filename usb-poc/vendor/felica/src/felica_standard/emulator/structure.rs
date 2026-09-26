@@ -16,8 +16,8 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 pub(super) const ROOT_AREA_CODE: u16 = 0x0000;
 pub(super) const ROOT_END_SERVICE_CODE: u16 = 0xFFFE;
 
-/// Highest node code the file system can address (§3.5: "エリアコードおよびサービス
-/// コードには、0000h～FFFEh が利用可能です"). `FFFFh` is reserved for the system node.
+/// Highest node code the file system can address (§3.5: "area codes and service
+/// codes may use 0000h–FFFEh"). `FFFFh` is reserved for the system node.
 const MAX_NODE_CODE: u16 = 0xFFFE;
 
 /// Area attribute meaning "child areas may be created below this area"
@@ -355,8 +355,8 @@ impl EmulatedArea {
     /// §3.4.6 forbids mixing random, cyclic and purse services in an overlap —
     /// each kind interprets its blocks differently — and that is rejected here.
     /// Where block counts differ the overlap target's count wins, which is what
-    /// an AES card does: "ブロック数が異なる場合、強制的にオーバーラップ先サービス
-    /// のブロック数に修正してサービスを登録します".
+    /// an AES card does: "if the block counts differ, the service is registered with its
+    /// block count forcibly corrected to that of the overlap target service".
     pub(super) fn sync_overlapping_services(
         &mut self,
         registry: &mut BTreeMap<u16, OverlapGroup>,
@@ -423,7 +423,7 @@ pub struct LimitPurseProperty {
 
 impl Default for LimitPurseProperty {
     fn default() -> Self {
-        // Table 3-8: 上限値 7FFFFFFFh, 下限値 00000000h, 世代番号 00h.
+        // Table 3-8: upper limit 7FFFFFFFh, lower limit 00000000h, generation number 00h.
         Self {
             upper_limit: i32::MAX,
             lower_limit: 0,
@@ -789,8 +789,8 @@ mod tests {
     }
 
     /// §3.4.6: services sharing a service number overlap onto one set of blocks,
-    /// but "ランダム／サイクリック／パースサービスを混用させてオーバーラップさせること
-    /// はできません" — each kind reads its blocks differently, so a mixed overlap
+    /// but "random, cyclic and purse services cannot be mixed in an
+    /// overlap" — each kind reads its blocks differently, so a mixed overlap
     /// has no meaning.
     #[test]
     fn overlapping_services_must_agree_on_the_service_kind() {

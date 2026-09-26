@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="172" height="108" viewBox="0 0 172 108" role="img" aria-label="SuiCash カード">
-  <title>SuiCash カード</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="172" height="108" viewBox="0 0 172 108" role="img" aria-label="SuiCash card">
+  <title>SuiCash card</title>
   <style><![CDATA[@import url('https://fonts.googleapis.com/css2?family=REM:wght@100..900&display=block');]]></style>
   <defs>
     <linearGradient id="scSilver" x1="0" y1="0" x2="0" y2="1">
@@ -16,16 +16,16 @@
   </defs>
 
   <g clip-path="url(#scCardClip)">
-    <!-- 下地(シルバー) -->
+    <!-- base (silver) -->
     <rect x="0" y="0" width="172" height="108" fill="url(#scSilver)" />
 
-    <!-- 台形パネル(テーマカラーのアクア) -->
+    <!-- trapezoidal panel (theme-color aqua) -->
     <path d="M 12 7 H 76 Q 80 7 81.2 10.8 L 108.8 98.2 Q 110 102 106 102 H 12 Q 7 102 7 97 V 12 Q 7 7 12 7 Z" fill="url(#scAqua)" />
 
-    <!-- 左上の挿入方向マーク -->
+    <!-- insertion-direction mark, top left -->
     <path d="M 15 2.2 L 10.4 4.3 L 15 6.4 Z" fill="#0a1a2f" opacity="0.7" />
 
-    <!-- マスコット(assets/mascot/suicash-mascot.svg を埋め込み) -->
+    <!-- mascot (embedded from assets/mascot/suicash-mascot.svg) -->
     <g transform="translate(110 36.4) scale(0.113)">
       <g fill="none" stroke-linecap="round">
         <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" stroke-width="78" />
@@ -62,7 +62,7 @@
       </g>
     </g>
 
-    <!-- ワードマーク: 台形パネル内の左下に白で(iC はアウトライン) -->
+    <!-- wordmark: white, bottom left inside the trapezoidal panel (iC outlined) -->
     <text x="12" y="94" font-family="REM, sans-serif" font-weight="605" font-size="22" font-kerning="none" style="font-variation-settings:'wght' 605;font-variant-ligatures:none"><tspan fill="#ffffff">Su</tspan><tspan fill="none" stroke="#ffffff" stroke-width="1" stroke-linejoin="miter">iC</tspan><tspan fill="#ffffff">ash</tspan></text>
   </g>
 

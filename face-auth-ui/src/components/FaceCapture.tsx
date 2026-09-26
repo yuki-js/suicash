@@ -4,8 +4,8 @@ import { QualityMeter } from "./QualityMeter";
 import { MockSafrEngine, QUALITY_GATE, type DetectedFace } from "../sim";
 import type { FaceEngine } from "../engine";
 
-const PROBE_MS = 300;
-const STABLE_FRAMES = 5; // 品質ゲートをこの回数連続で通ると自動キャプチャ(約1.5秒)
+const PROBE_MS = 150;
+const STABLE_FRAMES = 1; // auto-capture after passing the quality gate this many consecutive times (~1.5s)
 
 interface Props {
   engine: FaceEngine;
@@ -16,7 +16,7 @@ interface Props {
   log?: (s: string) => void;
 }
 
-/** 顔の登録(enroll)/照合(auth)。品質ゲートを一定時間維持で自動キャプチャ */
+/** Face enrollment (enroll) / matching (auth). Auto-captures once the quality gate holds for a while */
 export function FaceCapture({ engine, mode, threshold, onResult, onCancel, log }: Props) {
   const [face, setFace] = useState<DetectedFace | null>(null);
   const [stable, setStable] = useState(0);
@@ -48,7 +48,7 @@ export function FaceCapture({ engine, mode, threshold, onResult, onCancel, log }
     }
   }, [busy, mode, engine, threshold, onResult, log]);
 
-  // 検出ループ
+  // Detection loop
   useEffect(() => {
     let stopped = false;
     let inflight = false;
@@ -71,7 +71,7 @@ export function FaceCapture({ engine, mode, threshold, onResult, onCancel, log }
     };
   }, [engine, busy]);
 
-  // ゲート維持で自動キャプチャ
+  // Auto-capture while the gate holds
   useEffect(() => {
     if (!busy && stable >= STABLE_FRAMES) {
       setStable(0);
@@ -81,32 +81,32 @@ export function FaceCapture({ engine, mode, threshold, onResult, onCancel, log }
 
   const gateOk = face !== null && MockSafrEngine.passesGate(face);
   const hint = busy
-    ? mode === "enroll" ? "登録しています…" : "照合しています…"
+    ? mode === "enroll" ? "Registering…" : "Verifying…"
     : !face
-      ? "顔をワクの中に合わせてください"
+      ? "Fit your face inside the frame"
       : !gateOk
         ? face.mask >= QUALITY_GATE.mask
-          ? "マスクを外してください"
-          : "明るい場所で、正面を向いてください"
-        : `そのままお待ちください… ${Math.min(100, Math.round((stable / STABLE_FRAMES) * 100))}%`;
+          ? "Please remove your mask"
+          : "Face forward in a well-lit place"
+        : `Hold still… ${Math.min(100, Math.round((stable / STABLE_FRAMES) * 100))}%`;
 
   return (
     <div className="capture">
       <div className="capture__head">
-        <span className="capture__title">{mode === "enroll" ? "顔を登録します" : "顔認証"}</span>
+        <span className="capture__title">{mode === "enroll" ? "Face Registration" : "Face Authentication"}</span>
       </div>
       <CameraView face={face} gateOk={gateOk} hint={hint} nativePreview={engine.kind === "safr"} />
       <div className="capture__meters">
-        <QualityMeter label="姿勢 (cpq)" value={face?.centerPoseQuality ?? null} gate={QUALITY_GATE.cpq} />
-        <QualityMeter label="コントラスト" value={face?.contrastQuality ?? null} gate={QUALITY_GATE.contrast} />
-        <QualityMeter label="鮮明さ" value={face?.sharpnessQuality ?? null} gate={QUALITY_GATE.sharpness} />
-        <QualityMeter label="マスク" value={face?.mask ?? null} gate={QUALITY_GATE.mask} invert />
+        <QualityMeter label="Pose (cpq)" value={face?.centerPoseQuality ?? null} gate={QUALITY_GATE.cpq} />
+        <QualityMeter label="Contrast" value={face?.contrastQuality ?? null} gate={QUALITY_GATE.contrast} />
+        <QualityMeter label="Sharpness" value={face?.sharpnessQuality ?? null} gate={QUALITY_GATE.sharpness} />
+        <QualityMeter label="Mask" value={face?.mask ?? null} gate={QUALITY_GATE.mask} invert />
       </div>
       <div className="capture__actions">
         <button className="btn btn--primary" disabled={!gateOk || busy} onClick={capture}>
-          {mode === "enroll" ? "この顔を登録" : "この顔で認証"}
+          {mode === "enroll" ? "Register this face" : "Verify this face"}
         </button>
-        <button className="btn btn--ghost" onClick={onCancel}>キャンセル</button>
+        <button className="btn btn--ghost" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );

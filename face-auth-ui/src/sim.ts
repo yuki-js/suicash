@@ -1,18 +1,18 @@
 /**
- * 顔認証エンジン(SAFR eSDK)のモック。
- * エンジンの呼び出し順(detectFaces → learn / recognize)と応答仕様
- * (confidence 1.0 超あり・品質しきい値・結果コード)だけを UI 検証用に再現する。
- * 実際の顔検出・特徴量抽出は行わない。
+ * Mock of the face recognition engine (SAFR eSDK).
+ * Reproduces only the engine's call order (detectFaces → learn / recognize) and response
+ * spec (confidence can exceed 1.0, quality thresholds, result codes) for UI testing.
+ * No actual face detection or feature extraction is performed.
  */
 
 export interface DetectedFace {
-  confidence: number; // 照合スコア。0〜1 の確率ではなく 1.0 超あり
-  centerPoseQuality: number; // cpq >= 0.59 が合格
-  contrastQuality: number; // >= 0.45 が合格
-  sharpnessQuality: number; // >= 0.45 が合格
-  mask: number; // < 0.30 でマスクなし判定
-  bounds: { x: number; y: number; w: number; h: number }; // 0..1 正規化
-  extraRotation: 0 | 90 | 180 | 270; // 多方向リトライで採用された追加回転
+  confidence: number; // Match score. Not a 0-1 probability; can exceed 1.0
+  centerPoseQuality: number; // passes at cpq >= 0.59
+  contrastQuality: number; // passes at >= 0.45
+  sharpnessQuality: number; // passes at >= 0.45
+  mask: number; // < 0.30 means no mask
+  bounds: { x: number; y: number; w: number; h: number }; // normalized 0..1
+  extraRotation: 0 | 90 | 180 | 270; // extra rotation adopted by the multi-orientation retry
 }
 
 export interface RecognizeResult {
@@ -30,7 +30,7 @@ export const QUALITY_GATE = {
 export const DEFAULT_THRESHOLD = 0.8;
 export const MAX_THRESHOLD = 2.0;
 
-/** 平滑ランダムウォークで「それらしい」品質値を揺らすジェネレータ */
+/** Generator that jitters plausible quality values with a smoothed random walk */
 class Walk {
   private v: number;
   constructor(
@@ -50,7 +50,7 @@ class Walk {
 }
 
 export class MockSafrEngine {
-  /** person store はメモリ内・揮発(実エンジンと同じ) */
+  /** The person store is in-memory and volatile (same as the real engine) */
   private registered = false;
   private cpq = new Walk(0.72, 0.35, 0.95, 0.045);
   private contrast = new Walk(0.62, 0.3, 0.9, 0.035);
@@ -64,7 +64,7 @@ export class MockSafrEngine {
     return this.registered;
   }
 
-  /** プレビュー 1 フレームぶんの検出結果。まれに未検出(null)を返す */
+  /** Detection result for one preview frame. Occasionally returns no face (null) */
   detectFaces(): DetectedFace | null {
     if (Math.random() < 0.04) return null;
     const w = this.size.next();
@@ -93,17 +93,17 @@ export class MockSafrEngine {
     );
   }
 
-  /** 登録: clearPersonStore → learnPerson 相当 */
+  /** Enroll: equivalent to clearPersonStore → learnPerson */
   learnPerson(face: DetectedFace): RecognizeResult {
     if (!MockSafrEngine.passesGate(face)) return { code: 65, face };
     this.registered = true;
     return { code: 0, face };
   }
 
-  /** 照合: recognizePerson 相当 */
+  /** Match: equivalent to recognizePerson */
   recognizePerson(face: DetectedFace, threshold: number): RecognizeResult {
     if (!MockSafrEngine.passesGate(face)) return { code: 160, face: null };
-    // 実測レンジ(自機での検証値): 同一人物 0.998〜1.30 / 条件が悪い・未登録 0.55〜0.70
+    // Measured ranges (on our device): same person 0.998-1.30 / poor conditions or unregistered 0.55-0.70
     const confidence = this.registered
       ? clamp(gauss(1.08, 0.11), 0.92, 1.34)
       : clamp(gauss(0.62, 0.05), 0.5, 0.72);
@@ -120,7 +120,7 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
 
-/** Box-Muller 正規乱数 */
+/** Box-Muller normal random numbers */
 function gauss(mean: number, sd: number): number {
   const u = 1 - Math.random();
   const v = Math.random();

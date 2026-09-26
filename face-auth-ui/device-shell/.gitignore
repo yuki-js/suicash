@@ -1,11 +1,11 @@
-# 商用顔認証エンジン(SAFR eSDK)の素材は非再配布のため git に入れない。
-# ビルドする本人が自機の環境からローカルに配置する。
+# The commercial face-recognition engine (SAFR eSDK) assets are not redistributable, so keep them out of git.
+# Whoever builds places them locally from their own device environment.
 libs/
 assets/ESDKModels.zip
 src/jp/co/nextware/
 src/jp/serkenn/hicara/suicashui/SafrLicense.java
 
-# ビルド生成物と鍵
+# Build outputs and keys
 build/
 dist/
 keys/

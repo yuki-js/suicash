@@ -1,36 +1,35 @@
 /**
- * 交通系 IC カードの券面番号 ⇔ 8 バイト IDi(発行 ID)の相互変換。
+ * Conversion between a transit IC card's printed number and its 8-byte IDi (issuance ID).
  *
- * 変換規則は felica-rs(MIT, soltia48/felica-rs)の `examples/dump_suica.rs`
- * にある `idi_bytes_to_str` / `issuer_id_info` を移植したもの。
- * nimoca の実サンプル `NR807 E200 1060 0517` = IDi `05D5 807E 2826 0205`
- * で一致を確認済み。
+ * The rules are ported from `idi_bytes_to_str` / `issuer_id_info` in
+ * `examples/dump_suica.rs` of felica-rs (MIT, soltia48/felica-rs).
+ * Verified against a real nimoca sample: `NR807 E200 1060 0517` = IDi `05D5 807E 2826 0205`.
  *
- * IDi 8 バイトの構造:
- *   b0-b1 : 発行体コード(issuer_id, BE16)→ 英字2文字(表引き。無ければ 16進4桁)
- *   b2-b3 : 追加識別子 → 16進大文字そのまま(4 文字)
- *   b4-b5 : 発行日 v(BE16)→ 年 (v>>9)&0x3F / 月 (v>>5)&0x0F / 日 v&0x1F → YYMMDD
- *   b6-b7 : 連番(BE16)→ 10進 5 桁ゼロ詰め
+ * IDi 8-byte layout:
+ *   b0-b1 : issuer code (issuer_id, BE16) -> 2 letters (table lookup; else 4 hex digits)
+ *   b2-b3 : extra ID -> uppercase hex as-is (4 chars)
+ *   b4-b5 : issue date v (BE16) -> year (v>>9)&0x3F / month (v>>5)&0x0F / day v&0x1F -> YYMMDD
+ *   b6-b7 : serial (BE16) -> 5 decimal digits, zero-padded
  *
- * 券面番号は「英字2 or 16進4」+「16進4」+「YYMMDD(6)」+「連番(5)」。
- * 発行体が表にある場合 2+4+6+5 = 17 文字、無い場合 4+4+6+5 = 19 文字。
+ * Card number = "2 letters or 4 hex" + "4 hex" + "YYMMDD (6)" + "serial (5)".
+ * 17 chars if the issuer is in the table (2+4+6+5), otherwise 19 chars (4+4+6+5).
  */
 
-/** 発行体コード(issuer_id)→ 券面プレフィックス英字 */
+/** Issuer code (issuer_id) -> card number letter prefix */
 const ISSUER_TO_PREFIX: Record<number, string> = {
-  0x0102: "JH", // 北海道旅客鉄道
-  0x0103: "JE", // 東日本旅客鉄道
-  0x0104: "JC", // 東海旅客鉄道
-  0x0105: "JW", // 西日本旅客鉄道
-  0x0107: "JK", // 九州旅客鉄道
-  0x0252: "PB", // パスモ
-  0x0387: "TP", // 名古屋交通開発機構・エムアイシー
-  0x04ad: "SU", // スルッとKANSAI
-  0x05d5: "NR", // ニモカ
-  0x05d7: "FC", // 福岡市交通局
+  0x0102: "JH", // JR Hokkaido
+  0x0103: "JE", // JR East
+  0x0104: "JC", // JR Central
+  0x0105: "JW", // JR West
+  0x0107: "JK", // JR Kyushu
+  0x0252: "PB", // PASMO
+  0x0387: "TP", // Nagoya Transportation Development Organization / MIC
+  0x04ad: "SU", // Surutto KANSAI
+  0x05d5: "NR", // nimoca
+  0x05d7: "FC", // Fukuoka City Transportation Bureau
 };
 
-/** 逆引き(プレフィックス英字 → issuer_id) */
+/** Reverse lookup (letter prefix -> issuer_id) */
 const PREFIX_TO_ISSUER: Record<string, number> = Object.fromEntries(
   Object.entries(ISSUER_TO_PREFIX).map(([k, v]) => [v, Number(k)]),
 );
@@ -44,8 +43,8 @@ function hex4(n: number): string {
 }
 
 /**
- * 8 バイト IDi(16 hex 文字)→ 券面番号(空白なしの連結文字列)。
- * 入力が 8 バイトでなければ null。
+ * 8-byte IDi (16 hex chars) -> card number (concatenated, no spaces).
+ * null if the input is not 8 bytes.
  */
 export function idiToCardNumber(idiHex: string): string | null {
   const b = hexToBytes(idiHex);
@@ -72,15 +71,15 @@ export function idiToCardNumber(idiHex: string): string | null {
 }
 
 /**
- * 券面番号(空白除去済み)→ 8 バイト IDi(16 hex 文字)。
- * 逆変換できない(発行体プレフィックス不明・桁数不一致・日付や連番が範囲外)
- * 場合は null を返す。
+ * Card number (spaces removed) -> 8-byte IDi (16 hex chars).
+ * Returns null if it can't be inverted (unknown issuer prefix, wrong length,
+ * date or serial out of range).
  */
 export function cardNumberToIdi(card: string): string | null {
   const s = card.replace(/[\s-]/g, "").toUpperCase();
 
-  // head の切り出し: 先頭が既知プレフィックス(英字2)ならそれ、
-  // でなければ先頭 4 文字を 16進 issuer_id として扱う。
+  // Extract the head: a known 2-letter prefix if present,
+  // otherwise treat the first 4 chars as a hex issuer_id.
   let issuer: number;
   let rest: string;
   const prefix2 = s.slice(0, 2);
@@ -94,7 +93,7 @@ export function cardNumberToIdi(card: string): string | null {
     return null;
   }
 
-  // rest = remainder(hex4) + date(6) + tail(5) = 15 文字
+  // rest = remainder(hex4) + date(6) + tail(5) = 15 chars
   if (rest.length !== 15) return null;
   const remainderHex = rest.slice(0, 4);
   const dateStr = rest.slice(4, 10);
@@ -109,7 +108,7 @@ export function cardNumberToIdi(card: string): string | null {
   const yy = parseInt(dateStr.slice(0, 2), 10);
   const month = parseInt(dateStr.slice(2, 4), 10);
   const day = parseInt(dateStr.slice(4, 6), 10);
-  if (month > 0x0f || day > 0x1f) return null; // ビット幅に収まらない
+  if (month > 0x0f || day > 0x1f) return null; // doesn't fit the bit width
   const v = (yy << 9) | (month << 5) | day;
 
   const tail = parseInt(tailStr, 10);
@@ -128,7 +127,7 @@ export function cardNumberToIdi(card: string): string | null {
   return bytesToHex(bytes);
 }
 
-/** 券面番号が IDi へ一意に逆変換できるか(往復一致で確認) */
+/** Whether the card number uniquely inverts to an IDi (checked by round-trip) */
 export function isConvertibleCardNumber(card: string): boolean {
   const idi = cardNumberToIdi(card);
   if (!idi) return false;
@@ -136,10 +135,10 @@ export function isConvertibleCardNumber(card: string): boolean {
   return back === card.replace(/[\s-]/g, "").toUpperCase();
 }
 
-/** 券面番号を表示用に整形(先頭 head + 4桁区切り、nimoca 券面の見た目に寄せる) */
+/** Format a card number for display (head + groups of 4, matching the nimoca card look) */
 export function formatCardNumber(card: string): string {
   const s = card.replace(/[\s-]/g, "").toUpperCase();
-  // 交通系の券面表記は「NR807 E200 1060 0517」= 5-4-4-4。
+  // Transit cards print it as "NR807 E200 1060 0517" = 5-4-4-4.
   const groups = [s.slice(0, 5), s.slice(5, 9), s.slice(9, 13), s.slice(13, 17)];
   return groups.filter(Boolean).join(" ");
 }

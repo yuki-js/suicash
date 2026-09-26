@@ -252,7 +252,7 @@ impl AuthenticatedContext {
     /// Records the session's addressable node list.
     ///
     /// A block list element names its target by position in this list (§4.4.5,
-    /// "サービスコードリスト順番"), so anything that has to identify a node of
+    /// "Service Code List Order"), so anything that has to identify a node of
     /// the live session — reading a block, or [`change_keys`] naming the node
     /// whose key it replaces — depends on the order being preserved.
     ///

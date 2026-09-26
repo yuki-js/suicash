@@ -1,21 +1,21 @@
-//! SuiCash 決済端末の母艦デーモン。
+//! Host PC daemon for the SuiCash payment terminal.
 //!
-//! 役割:
-//!  1. FeliCa(Suica/PASMO)を RC-S634 で読み、オラクルで IDi を認証
-//!  2. IDi 導出ウォレットの残高照会・オンチェーン送金(sui-pay.mjs 経由)
-//!  3. 端末(Hi-CARA の WebView)と WebSocket で連携:
-//!       母艦→端末: card / mode / paymentResult / cardRemoved
-//!       端末→母艦: faceOk / faceNg / enrolled / cancel
-//!  4. オペレータ CLI: 残高照会モード / 決済待機(額指定)の切替
+//! Responsibilities:
+//!  1. Read FeliCa (Suica/PASMO) with the RC-S634 and authenticate the IDi via the oracle
+//!  2. Balance query and on-chain transfer for the IDi-derived wallet (via sui-pay.mjs)
+//!  3. Talk to the terminal (Hi-CARA WebView) over WebSocket:
+//!       host → terminal: card / mode / paymentResult / cardRemoved
+//!       terminal → host: faceOk / faceNg / enrolled / cancel
+//!  4. Operator CLI: switch between balance mode / awaiting payment (with amount)
 //!
-//! 端末は adb reverse tcp:<port> 経由で ws://localhost:<port> に接続する。
+//! The terminal connects to ws://localhost:<port> via adb reverse tcp:<port>.
 //!
-//! 環境変数:
-//!   FACEPAY_ORACLE   オラクル JSON-RPC(既定 felica-oracle.ouchiserver...)
-//!   FACEPAY_WS_PORT  WebSocket ポート(既定 8899)
-//!   FACEPAY_MERCHANT 店舗アドレス(決済の送金先。必須)
-//!   FACEPAY_SUI_HELPER  sui-pay.mjs のパス(既定 ./sui-pay.mjs)
-//!   SUI_RPC          fullnode RPC(sui-pay.mjs に引き継ぐ)
+//! Environment:
+//!   FACEPAY_ORACLE   oracle JSON-RPC (default felica-oracle.ouchiserver...)
+//!   FACEPAY_WS_PORT  WebSocket port (default 8899)
+//!   FACEPAY_MERCHANT merchant address (payment recipient; required)
+//!   FACEPAY_SUI_HELPER  path to sui-pay.mjs (default ./sui-pay.mjs)
+//!   SUI_RPC          fullnode RPC (passed to sui-pay.mjs)
 
 use std::io::BufRead;
 use std::process::Command;
@@ -39,11 +39,11 @@ struct Config {
 
 #[derive(Default)]
 struct Shared {
-    /// 決済待機額(MIST)。None = 残高照会モード
+    /// Pending payment amount (MIST). None = balance mode
     pay_mode: Option<u64>,
-    /// いま端末に出しているカードの IDi
+    /// IDi of the card currently shown on the terminal
     current_idi: Option<String>,
-    /// 端末への送信口(WS 接続中のみ Some)
+    /// Sender to the terminal (Some only while WS is connected)
     term_tx: Option<Sender<String>>,
 }
 
@@ -59,21 +59,21 @@ fn main() {
     let state: State = Arc::new(Mutex::new(Shared::default()));
 
     eprintln!("facepay-host: oracle={} ws=:{} merchant={}", cfg.oracle, cfg.ws_port,
-        if cfg.merchant.is_empty() { "(未設定: 決済不可)" } else { &cfg.merchant });
+        if cfg.merchant.is_empty() { "(unset: payments disabled)" } else { &cfg.merchant });
 
-    // WebSocket サーバ(端末連携)
+    // WebSocket server (terminal link)
     {
         let state = state.clone();
         let cfg = cfg.clone();
         thread::spawn(move || ws_server(state, cfg));
     }
-    // CLI(オペレータ操作)
+    // CLI (operator control)
     {
         let state = state.clone();
         let cfg = cfg.clone();
         thread::spawn(move || cli_loop(state, cfg));
     }
-    // FeliCa 読取ループ(メインスレッド)
+    // FeliCa read loop (main thread)
     felica_loop(state, cfg);
 }
 
@@ -81,7 +81,7 @@ fn env(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
 
-// ----------------------------------------------------------------- 端末へ送信
+// ----------------------------------------------------------------- Send to terminal
 
 fn send_terminal(state: &State, json: String) {
     let tx = { state.lock().unwrap().term_tx.clone() };
@@ -90,18 +90,18 @@ fn send_terminal(state: &State, json: String) {
     }
 }
 
-// ------------------------------------------------------------- WebSocket サーバ
+// ------------------------------------------------------------- WebSocket server
 
 fn ws_server(state: State, cfg: Arc<Config>) {
     let addr = format!("127.0.0.1:{}", cfg.ws_port);
     let listener = match std::net::TcpListener::bind(&addr) {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("WS bind 失敗 {addr}: {e}");
+            eprintln!("WS bind failed {addr}: {e}");
             return;
         }
     };
-    eprintln!("WS 待受 {addr}(端末は adb reverse tcp:{0} で接続)", cfg.ws_port);
+    eprintln!("WS listening on {addr} (terminal connects via adb reverse tcp:{0})", cfg.ws_port);
     for stream in listener.incoming() {
         let stream = match stream {
             Ok(s) => s,
@@ -111,7 +111,7 @@ fn ws_server(state: State, cfg: Arc<Config>) {
         let cfg = cfg.clone();
         thread::spawn(move || {
             if let Err(e) = ws_handle(stream, state, cfg) {
-                eprintln!("WS 接続終了: {e}");
+                eprintln!("WS connection closed: {e}");
             }
         });
     }
@@ -123,26 +123,26 @@ fn ws_handle(
     cfg: Arc<Config>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut ws = tungstenite::accept(stream)?;
-    // 読み取りにタイムアウトを設け、送受信を1ループで回す
+    // Put a timeout on reads and handle send/receive in one loop
     ws.get_ref().set_read_timeout(Some(Duration::from_millis(100)))?;
-    eprintln!("端末が接続しました");
+    eprintln!("Terminal connected");
 
     let (tx, rx) = channel::<String>();
     {
         let mut s = state.lock().unwrap();
         s.term_tx = Some(tx);
-        // 接続直後に現在モードを通知
+        // Announce the current mode right after connecting
         let mode = mode_json(s.pay_mode);
         drop(s);
         let _ = ws.send(tungstenite::Message::Text(mode));
     }
 
     loop {
-        // 送信キューを掃く
+        // Drain the send queue
         while let Ok(msg) = rx.try_recv() {
             ws.send(tungstenite::Message::Text(msg))?;
         }
-        // 受信(タイムアウトあり)
+        // Receive (with timeout)
         match ws.read() {
             Ok(tungstenite::Message::Text(t)) => handle_report(&t, &state, &cfg),
             Ok(tungstenite::Message::Close(_)) => break,
@@ -153,7 +153,7 @@ fn ws_handle(
             Err(e) => return Err(e.into()),
         }
     }
-    // 切断: 送信口を外す
+    // Disconnected: drop the sender
     let mut s = state.lock().unwrap();
     s.term_tx = None;
     Ok(())
@@ -166,14 +166,14 @@ fn mode_json(pay_mode: Option<u64>) -> String {
     }
 }
 
-/// 端末からのレポート処理
+/// Handle reports from the terminal
 fn handle_report(text: &str, state: &State, cfg: &Arc<Config>) {
     let v: serde_json::Value = match serde_json::from_str(text) {
         Ok(v) => v,
         Err(_) => return,
     };
     let t = v.get("type").and_then(|x| x.as_str()).unwrap_or("");
-    eprintln!("端末→母艦: {t}");
+    eprintln!("terminal → host: {t}");
     match t {
         "faceOk" => {
             let (pay_mode, idi) = {
@@ -181,23 +181,23 @@ fn handle_report(text: &str, state: &State, cfg: &Arc<Config>) {
                 (s.pay_mode, s.current_idi.clone())
             };
             if let (Some(amount), Some(idi)) = (pay_mode, idi) {
-                // 決済モード: 送金を別スレッドで実行
+                // Payment mode: run the transfer on a separate thread
                 let state = state.clone();
                 let cfg = cfg.clone();
                 thread::spawn(move || run_payment(&state, &cfg, &idi, amount));
             }
-            // 残高照会モードは端末側が残高を表示済み。母艦は何もしない
+            // In balance mode the terminal already shows the balance. Nothing to do on the host
         }
         _ => {}
     }
 }
 
-/// 決済(送金)を実行し paymentResult を端末へ返す
+/// Execute the payment (transfer) and send paymentResult back to the terminal
 fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
     if cfg.merchant.is_empty() {
         send_terminal(
             state,
-            r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"店舗アドレス未設定"}"#.to_string(),
+            r#"{"type":"paymentResult","ok":false,"amount":"0","balanceAfter":"0","error":"merchant address not set"}"#.to_string(),
         );
         return;
     }
@@ -210,7 +210,7 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
             r#"{{"type":"paymentResult","ok":true,"amount":"{amount}","balanceAfter":"{after}","digest":"{digest}"}}"#
         )
     } else {
-        let err = res.get("error").and_then(|x| x.as_str()).unwrap_or("送金失敗");
+        let err = res.get("error").and_then(|x| x.as_str()).unwrap_or("transfer failed");
         format!(
             r#"{{"type":"paymentResult","ok":false,"amount":"{amount}","balanceAfter":"0","error":{}}}"#,
             serde_json::to_string(err).unwrap()
@@ -219,7 +219,7 @@ fn run_payment(state: &State, cfg: &Arc<Config>, idi: &str, amount: u64) {
     send_terminal(state, msg);
 }
 
-// ------------------------------------------------------------- sui-pay.mjs 呼出
+// ------------------------------------------------------------- sui-pay.mjs calls
 
 fn sui_helper(cfg: &Config, args: &[&str]) -> serde_json::Value {
     let out = Command::new("node").arg(&cfg.sui_helper).args(args).output();
@@ -229,7 +229,7 @@ fn sui_helper(cfg: &Config, args: &[&str]) -> serde_json::Value {
             serde_json::from_str(s.trim().lines().last().unwrap_or("{}"))
                 .unwrap_or_else(|_| serde_json::json!({"ok":false,"error":"helper parse error"}))
         }
-        Err(e) => serde_json::json!({"ok": false, "error": format!("node 実行失敗: {e}")}),
+        Err(e) => serde_json::json!({"ok": false, "error": format!("failed to run node: {e}")}),
     }
 }
 
@@ -254,9 +254,9 @@ fn cli_loop(state: State, cfg_for_cli: Arc<Config>) {
                         s.pay_mode = Some(mist);
                     }
                     send_terminal(&state, mode_json(Some(mist)));
-                    println!("→ 決済待機 {sui} SUI ({mist} MIST)");
+                    println!("→ Awaiting payment {sui} SUI ({mist} MIST)");
                 } else {
-                    println!("使い方: pay <SUI>  例) pay 0.3");
+                    println!("Usage: pay <SUI>  e.g. pay 0.3");
                 }
             }
             Some("idle") => {
@@ -264,30 +264,30 @@ fn cli_loop(state: State, cfg_for_cli: Arc<Config>) {
                     state.lock().unwrap().pay_mode = None;
                 }
                 send_terminal(&state, mode_json(None));
-                println!("→ 残高照会モード");
+                println!("→ Balance mode");
             }
             Some("status") => {
                 let s = state.lock().unwrap();
                 println!(
                     "mode={} card={} terminal={}",
                     match s.pay_mode {
-                        Some(m) => format!("決済 {} MIST", m),
-                        None => "残高照会".into(),
+                        Some(m) => format!("pay {} MIST", m),
+                        None => "balance".into(),
                     },
-                    s.current_idi.clone().unwrap_or_else(|| "(なし)".into()),
-                    if s.term_tx.is_some() { "接続中" } else { "未接続" }
+                    s.current_idi.clone().unwrap_or_else(|| "(none)".into()),
+                    if s.term_tx.is_some() { "connected" } else { "disconnected" }
                 );
             }
             Some("testcard") => {
-                // リーダー無しで検証・デモするための擬似カード投入
+                // Simulated card insertion for testing/demos without a reader
                 if let Some(idi) = it.next() {
                     let idi = idi.to_string();
-                    println!("→ 擬似カード投入 idi={idi}");
+                    println!("→ Simulated card inserted idi={idi}");
                     let state2 = state.clone();
                     let cfg2 = cfg_for_cli.clone();
                     thread::spawn(move || on_card(&state2, &cfg2, &idi));
                 } else {
-                    println!("使い方: testcard <idiHex>  例) testcard 05d5807e28260205");
+                    println!("Usage: testcard <idiHex>  e.g. testcard 05d5807e28260205");
                 }
             }
             Some("remove") => {
@@ -295,36 +295,36 @@ fn cli_loop(state: State, cfg_for_cli: Arc<Config>) {
                     state.lock().unwrap().current_idi = None;
                 }
                 send_terminal(&state, r#"{"type":"cardRemoved"}"#.to_string());
-                println!("→ カード離脱(擬似)");
+                println!("→ Card removed (simulated)");
             }
             Some("quit") | Some("exit") => std::process::exit(0),
-            Some(other) => println!("不明なコマンド: {other}"),
+            Some(other) => println!("Unknown command: {other}"),
             None => {}
         }
     }
 }
 
-// ------------------------------------------------------------- FeliCa 読取ループ
+// ------------------------------------------------------------- FeliCa read loop
 
 fn felica_loop(state: State, cfg: Arc<Config>) {
     let mut reader = match open_reader(ReaderPreference::Auto) {
         Ok(r) => r,
         Err(e) => {
-            // リーダーが無くても WS/CLI は動かし続ける(testcard で検証・デモ可)
-            eprintln!("リーダーを開けません(testcard で擬似投入は可能): {e:?}");
+            // Keep WS/CLI running without a reader (testcard still works for testing/demos)
+            eprintln!("Cannot open reader (simulated insertion via testcard still available): {e:?}");
             loop {
                 thread::sleep(Duration::from_secs(3600));
             }
         }
     };
-    eprintln!("FeliCa リーダー準備完了。カード待ち…");
+    eprintln!("FeliCa reader ready. Waiting for a card…");
     let mut last_idm = String::new();
     loop {
         let driver = reader.driver_mut();
         match read_card_idi(driver, &cfg) {
             Ok(Some((idm, idi))) => {
                 if idm == last_idm {
-                    // 同じカードが載りっぱなし。離れるまで待つ
+                    // Same card still present. Wait until it is removed
                     thread::sleep(Duration::from_millis(400));
                     continue;
                 }
@@ -332,7 +332,7 @@ fn felica_loop(state: State, cfg: Arc<Config>) {
                 on_card(&state, &cfg, &idi);
             }
             Ok(None) => {
-                // カードなし。直前まで載っていたら「離れた」通知
+                // No card. If one was present, send a "removed" notice
                 if !last_idm.is_empty() {
                     last_idm.clear();
                     let mut s = state.lock().unwrap();
@@ -343,19 +343,19 @@ fn felica_loop(state: State, cfg: Arc<Config>) {
                 thread::sleep(Duration::from_millis(300));
             }
             Err(e) => {
-                eprintln!("読取エラー: {e}");
+                eprintln!("Read error: {e}");
                 thread::sleep(Duration::from_millis(300));
             }
         }
     }
 }
 
-/// カード発見時: 残高照会・登録判定して card イベントを端末へ
+/// On card detection: query balance, check registration, and send a card event to the terminal
 fn on_card(state: &State, cfg: &Arc<Config>, idi: &str) {
-    eprintln!("カード: IDi={idi}");
+    eprintln!("Card: IDi={idi}");
     let bal = sui_helper(cfg, &["balance", idi]);
     let balance = bal.get("balance").and_then(|x| x.as_str()).unwrap_or("0").to_string();
-    // オンチェーン登録の判定は残高 > 0(regist-web でチャージ済み=登録済み)を代用
+    // On-chain registration is approximated by balance > 0 (topped up via regist-web = registered)
     let registered = balance.parse::<u128>().map(|n| n > 0).unwrap_or(false);
     {
         let mut s = state.lock().unwrap();
@@ -367,7 +367,7 @@ fn on_card(state: &State, cfg: &Arc<Config>, idi: &str) {
     send_terminal(state, ev);
 }
 
-/// 1回ポーリングし、カードがあればオラクルで IDi を得る。無ければ None
+/// Poll once; if a card is present, get its IDi from the oracle. Otherwise None
 fn read_card_idi<D: FelicaDriver + ?Sized>(
     driver: &mut D,
     cfg: &Config,
@@ -375,7 +375,7 @@ fn read_card_idi<D: FelicaDriver + ?Sized>(
     let (mut felica, _) =
         match FelicaStandard::polling_multi(driver, &["212F", "424F"], SYSTEM_CODE, 0x00, 0x00) {
             Ok(f) => f,
-            Err(_) => return Ok(None), // カードなし
+            Err(_) => return Ok(None), // no card
         };
     let idm_hex = hex::encode(felica.idm());
 
@@ -392,17 +392,17 @@ fn read_card_idi<D: FelicaDriver + ?Sized>(
     )?;
     let c2b = hex8(&st["c2b"])?;
     let resp = felica.authentication2(&c2b)?;
-    let ct = extract_ciphertext(&format!("{resp:?}")).ok_or("auth2 抽出失敗")?;
+    let ct = extract_ciphertext(&format!("{resp:?}")).ok_or("failed to extract auth2")?;
     let at = rpc(
         cfg,
         "attest",
         serde_json::json!({"idm": idm_hex, "c1b": hex::encode(c1b), "c2a": hex::encode(c2a), "auth2": hex::encode(&ct)}),
     )?;
-    let idi = at["idi"].as_str().ok_or("idi なし")?.to_string();
+    let idi = at["idi"].as_str().ok_or("missing idi")?.to_string();
     Ok(Some((idm_hex, idi)))
 }
 
-// ------------------------------------------------------------- オラクル RPC / util
+// ------------------------------------------------------------- Oracle RPC / util
 
 fn rpc(cfg: &Config, method: &str, params: serde_json::Value) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let body = serde_json::json!({"jsonrpc":"2.0","id":1,"method":method,"params":params});
@@ -417,7 +417,7 @@ fn rpc(cfg: &Config, method: &str, params: serde_json::Value) -> Result<serde_js
 }
 
 fn hex8(v: &serde_json::Value) -> Result<[u8; 8], Box<dyn std::error::Error>> {
-    let s = v.as_str().ok_or("hex string 期待")?;
+    let s = v.as_str().ok_or("expected hex string")?;
     hex::decode(s)?.try_into().map_err(|_| "not 8 bytes".into())
 }
 
@@ -427,7 +427,7 @@ fn u16_list(v: &serde_json::Value) -> Vec<u16> {
         .unwrap_or_default()
 }
 
-/// Authentication2Response の暗号文(private)を Debug 表示から取り出す
+/// Extract the (private) ciphertext of Authentication2Response from its Debug output
 fn extract_ciphertext(dbg: &str) -> Option<Vec<u8>> {
     let start = dbg.find('[')?;
     let end = dbg[start..].find(']')? + start;
