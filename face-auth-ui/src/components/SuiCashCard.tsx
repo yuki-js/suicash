@@ -1,7 +1,7 @@
 /**
- * SuiCash プリペイドカードの券面。交通系 IC カード風のオリジナルデザイン。
- * - 地はシルバー、下部の多角形の山はテーマカラー(アクア #4DA2FF 系)
- * - ワードマークは assets/logo/suicash-logo.svg と同じ組み方(REM 605、iC のみアウトライン)
+ * SuiCash プリペイドカードの券面。assets/card/suicash-card.svg と同一デザイン。
+ * - 地はシルバー、左にテーマカラー(アクア #4DA2FF 系)の台形パネル
+ * - ワードマークはパネル内左下、assets/logo/suicash-logo.svg と同じ組み方(REM 605、iC のみアウトライン)
  * - マスコットは assets/mascot/suicash-mascot.svg をインライン縮小配置
  *   (外部 SVG を <img> で読むと Web フォントが遮断されるため全てインラインで組む)
  */
@@ -14,14 +14,13 @@ export function SuiCashCard({ className }: { className?: string }) {
       aria-label="SuiCash カード"
     >
       <defs>
-        <linearGradient id="scCardBody" x1="0" y1="0" x2="0.4" y2="1">
-          <stop offset="0" stopColor="#f7fafc" />
-          <stop offset="0.55" stopColor="#e3e9ef" />
-          <stop offset="1" stopColor="#cdd6de" />
+        <linearGradient id="scSilver" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#f8f9f8" />
+          <stop offset="1" stopColor="#e2e6e4" />
         </linearGradient>
-        <linearGradient id="scChip" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#e8c96a" />
-          <stop offset="1" stopColor="#c9a13e" />
+        <linearGradient id="scAqua" x1="0" y1="0" x2="0.5" y2="1">
+          <stop offset="0" stopColor="#5cb0ff" />
+          <stop offset="1" stopColor="#3d95f5" />
         </linearGradient>
         <clipPath id="scCardClip">
           <rect x="0" y="0" width="172" height="108" rx="9" />
@@ -29,61 +28,20 @@ export function SuiCashCard({ className }: { className?: string }) {
       </defs>
 
       <g clipPath="url(#scCardClip)">
-        <rect x="0" y="0" width="172" height="108" fill="url(#scCardBody)" />
+        {/* 下地(シルバー) */}
+        <rect x="0" y="0" width="172" height="108" fill="url(#scSilver)" />
 
-        {/* 下部の多角形の山脈。テーマカラーのアクアで面を割る */}
-        <g>
-          <polygon
-            points="0,70 30,52 60,66 94,46 126,62 172,42 172,108 0,108"
-            fill="#4da2ff"
-          />
-          <polygon points="30,52 60,66 22,108 0,108 0,70" fill="#2f6fb8" />
-          <polygon points="94,46 126,62 96,108 56,108" fill="#6cb4ff" />
-          <polygon points="126,62 172,42 172,108 140,108" fill="#2f6fb8" />
-          {/* 山を横切る白い波 */}
-          <path
-            d="M-4,82 C30,72 62,92 98,78 C126,68 152,80 176,72"
-            fill="none"
-            stroke="#ffffff"
-            strokeWidth="3.4"
-            strokeLinecap="round"
-            opacity="0.92"
-          />
-        </g>
+        {/* 台形パネル(テーマカラーのアクア) */}
+        <path
+          d="M 12 7 H 76 Q 80 7 81.2 10.8 L 108.8 98.2 Q 110 102 106 102 H 12 Q 7 102 7 97 V 12 Q 7 7 12 7 Z"
+          fill="url(#scAqua)"
+        />
 
-        {/* IC チップ */}
-        <g>
-          <rect x="14" y="38" width="21" height="16" rx="2.5" fill="url(#scChip)" />
-          <path
-            d="M14 44 h21 M14 49 h21 M21 38 v16 M28 38 v16"
-            stroke="#8f742c"
-            strokeWidth="0.8"
-            fill="none"
-          />
-        </g>
+        {/* 左上の挿入方向マーク */}
+        <path d="M 15 2.2 L 10.4 4.3 L 15 6.4 Z" fill="#0a1a2f" opacity="0.7" />
 
-        {/* ワードマーク: Su / iC(アウトライン) / ash */}
-        <text
-          x="13"
-          y="27"
-          fontFamily="REM, sans-serif"
-          fontWeight="605"
-          fontSize="20"
-          style={{
-            fontVariationSettings: "'wght' 605",
-            fontVariantLigatures: "none",
-            fontKerning: "none",
-          }}
-        >
-          <tspan fill="#0a1a2f">Su</tspan>
-          <tspan fill="#ffffff" stroke="#0a1a2f" strokeWidth="0.9" strokeLinejoin="miter">
-            iC
-          </tspan>
-          <tspan fill="#0a1a2f">ash</tspan>
-        </text>
-
-        {/* マスコット。山の上に立たせる */}
-        <g transform="translate(118 26) scale(0.082)">
+        {/* マスコット(assets/mascot/suicash-mascot.svg を埋め込み) */}
+        <g transform="translate(110 36.4) scale(0.113)">
           <g fill="none" strokeLinecap="round">
             <path d="M198 206 C180 150 162 92 158 46" stroke="#0A1A2F" strokeWidth="78" />
             <path d="M318 204 C340 164 366 130 396 112" stroke="#0A1A2F" strokeWidth="62" />
@@ -124,6 +82,26 @@ export function SuiCashCard({ className }: { className?: string }) {
             <path d="M228 348 C238 364 258 362 266 346 Z" fill="#8FD6E8" />
           </g>
         </g>
+
+        {/* ワードマーク: 台形パネル内の左下に白で(iC はアウトライン) */}
+        <text
+          x="12"
+          y="94"
+          fontFamily="REM, sans-serif"
+          fontWeight="605"
+          fontSize="22"
+          style={{
+            fontVariationSettings: "'wght' 605",
+            fontVariantLigatures: "none",
+            fontKerning: "none",
+          }}
+        >
+          <tspan fill="#ffffff">Su</tspan>
+          <tspan fill="none" stroke="#ffffff" strokeWidth="1" strokeLinejoin="miter">
+            iC
+          </tspan>
+          <tspan fill="#ffffff">ash</tspan>
+        </text>
       </g>
 
       <rect
@@ -133,7 +111,7 @@ export function SuiCashCard({ className }: { className?: string }) {
         height="106.5"
         rx="8.5"
         fill="none"
-        stroke="rgba(10, 26, 47, 0.25)"
+        stroke="rgba(10, 26, 47, 0.28)"
         strokeWidth="1.5"
       />
     </svg>
